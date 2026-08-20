@@ -1,0 +1,179 @@
+export type Lang = 'es' | 'en';
+
+export interface Source {
+  id: string;
+  label: string;
+  url: string;
+}
+
+export const SOURCES: Source[] = [
+  { id: 'meta-reels', label: 'Instagram Creators (Meta)', url: 'https://creators.instagram.com/' },
+  { id: 'meta-captions', label: 'Meta Business Help Center', url: 'https://www.facebook.com/business/help' },
+  { id: 'tiktok-cc', label: 'TikTok Creative Center', url: 'https://ads.tiktok.com/business/creativecenter/' },
+  { id: 'yt-shorts', label: 'YouTube Help — Shorts', url: 'https://support.google.com/youtube' },
+  {
+    id: 'wcag-contrast',
+    label: 'W3C WCAG 2.1 — Contrast (Minimum)',
+    url: 'https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html',
+  },
+];
+
+type Dict = Record<string, string>;
+
+const es: Dict = {
+  'app.tagline': 'Editor rápido de reels + score de viralidad',
+  'nav.media': 'Material',
+  'nav.edit': 'Edición',
+  'nav.score': 'Score',
+  'drop.title': 'Suelta fotos o vídeos aquí',
+  'drop.hint': 'JPG, PNG, WebP, MP4, MOV, WebM · todo se procesa en tu dispositivo',
+  'drop.button': 'Elegir archivos',
+  'media.count': 'archivos',
+  'media.clear': 'Vaciar',
+  'template.label': 'Ritmo automático',
+  'template.punch': 'Punch — cortes rápidos',
+  'template.flow': 'Flow — medio',
+  'template.story': 'Story — narrativo',
+  'aspect.label': 'Formato',
+  'hook.label': 'Gancho (primeros segundos)',
+  'hook.placeholder': 'Ej: NADIE HACE ESTO CON SUS FOTOS',
+  'cta.label': 'Llamada a la acción (final)',
+  'cta.placeholder': 'Ej: Guárdalo para probarlo',
+  'duration.label': 'Duración objetivo',
+  'action.rebuild': 'Regenerar montaje',
+  'action.analyze': 'Analizar',
+  'action.export': 'Exportar vídeo',
+  'action.exporting': 'Grabando…',
+  'action.play': 'Reproducir',
+  'action.pause': 'Pausa',
+  'safe.label': 'Zonas seguras',
+  'audio.label': 'Música / audio',
+  'audio.pick': 'Añadir audio',
+  'audio.none': 'Sin audio',
+  'audio.remove': 'Quitar',
+  'score.title': 'Índice de viralidad',
+  'score.sub': 'Estimación heurística 1-100 a partir de métricas medibles del propio reel. No es una predicción garantizada.',
+  'score.empty': 'Importa material y pulsa Analizar.',
+  'score.factors': 'Desglose',
+  'score.tips': 'Qué mejorar',
+  'score.sources': 'Fuentes',
+  'score.recompute': 'Recalcular',
+  'factor.hook': 'Gancho (0-3 s)',
+  'factor.duration': 'Duración',
+  'factor.pace': 'Ritmo y cortes',
+  'factor.format': 'Formato vertical',
+  'factor.text': 'Texto en pantalla',
+  'factor.quality': 'Calidad de imagen',
+  'factor.loop': 'Cierre y bucle',
+  'tip.hook.missing': 'Añade un texto-gancho en el primer segundo: la retención se decide ahí.',
+  'tip.hook.long': 'Gancho demasiado largo. Máximo ~8 palabras para que se lea en 1 segundo.',
+  'tip.hook.slow': 'El primer plano dura demasiado. Corta antes de los 2 s para evitar el scroll.',
+  'tip.hook.flat': 'El primer fotograma tiene poco contraste/detalle. Empieza con la imagen más impactante.',
+  'tip.duration.short': 'Muy corto. Entre 7 y 21 s hay margen para gancho, desarrollo y cierre.',
+  'tip.duration.long': 'Demasiado largo para el formato. Recorta a menos de 21 s o divide en partes.',
+  'tip.pace.nocuts': 'No hay cortes. Añade cambios de plano o zooms: el movimiento sostiene la atención.',
+  'tip.pace.slow': 'Planos largos. Baja a 1-2 s por plano.',
+  'tip.pace.fast': 'Cortes demasiado rápidos: no da tiempo a leer ni entender.',
+  'tip.format.aspect': 'Usa 9:16 a pantalla completa: es el formato nativo de Reels, Shorts y TikTok.',
+  'tip.text.none': 'Añade texto de apoyo o subtítulos: gran parte del consumo es sin sonido.',
+  'tip.text.coverage': 'Poco texto en pantalla. Cubre al menos un tercio del vídeo con texto legible.',
+  'tip.quality.dark': 'Imagen oscura. Sube exposición o graba con más luz frontal.',
+  'tip.quality.bright': 'Imagen quemada. Baja exposición para recuperar detalle.',
+  'tip.quality.soft': 'Poco detalle o desenfoque. Evita zoom digital y limpia la lente.',
+  'tip.loop.diff': 'El final no enlaza con el principio. Cierra con un plano parecido al inicial para que el bucle sea invisible.',
+  'tip.loop.cta': 'Cierra con una llamada a la acción clara (guardar, comentar, seguir).',
+  'export.unsupported': 'Tu navegador no permite grabar vídeo. Prueba Chrome o Edge actualizados.',
+  'export.hint': 'La grabación es en tiempo real: dura lo mismo que el reel.',
+  'export.done': 'Vídeo descargado.',
+  'empty.preview': 'Sin material todavía',
+  'lang.switch': 'EN',
+  'footer.privacy': 'Todo el procesamiento ocurre en tu navegador. Ningún archivo se sube a ningún servidor.',
+};
+
+const en: Dict = {
+  'app.tagline': 'Fast reel editor + virality score',
+  'nav.media': 'Media',
+  'nav.edit': 'Edit',
+  'nav.score': 'Score',
+  'drop.title': 'Drop photos or videos here',
+  'drop.hint': 'JPG, PNG, WebP, MP4, MOV, WebM · everything stays on your device',
+  'drop.button': 'Choose files',
+  'media.count': 'files',
+  'media.clear': 'Clear',
+  'template.label': 'Auto pacing',
+  'template.punch': 'Punch — fast cuts',
+  'template.flow': 'Flow — medium',
+  'template.story': 'Story — narrative',
+  'aspect.label': 'Format',
+  'hook.label': 'Hook (first seconds)',
+  'hook.placeholder': 'e.g. NOBODY DOES THIS WITH THEIR PHOTOS',
+  'cta.label': 'Call to action (end)',
+  'cta.placeholder': 'e.g. Save this to try it',
+  'duration.label': 'Target duration',
+  'action.rebuild': 'Rebuild edit',
+  'action.analyze': 'Analyze',
+  'action.export': 'Export video',
+  'action.exporting': 'Recording…',
+  'action.play': 'Play',
+  'action.pause': 'Pause',
+  'safe.label': 'Safe zones',
+  'audio.label': 'Music / audio',
+  'audio.pick': 'Add audio',
+  'audio.none': 'No audio',
+  'audio.remove': 'Remove',
+  'score.title': 'Virality index',
+  'score.sub': 'Heuristic 1-100 estimate from measurable properties of the reel itself. Not a guaranteed prediction.',
+  'score.empty': 'Import media and hit Analyze.',
+  'score.factors': 'Breakdown',
+  'score.tips': 'What to improve',
+  'score.sources': 'Sources',
+  'score.recompute': 'Recompute',
+  'factor.hook': 'Hook (0-3 s)',
+  'factor.duration': 'Duration',
+  'factor.pace': 'Pacing & cuts',
+  'factor.format': 'Vertical format',
+  'factor.text': 'On-screen text',
+  'factor.quality': 'Image quality',
+  'factor.loop': 'Ending & loop',
+  'tip.hook.missing': 'Add a hook text in the first second: retention is decided there.',
+  'tip.hook.long': 'Hook too long. Keep it under ~8 words so it reads in one second.',
+  'tip.hook.slow': 'First shot runs too long. Cut before 2 s to beat the scroll.',
+  'tip.hook.flat': 'First frame has low contrast/detail. Open with your strongest image.',
+  'tip.duration.short': 'Too short. 7-21 s leaves room for hook, payoff and close.',
+  'tip.duration.long': 'Too long for the format. Trim under 21 s or split into parts.',
+  'tip.pace.nocuts': 'No cuts. Add shot changes or zooms: movement holds attention.',
+  'tip.pace.slow': 'Shots are long. Aim for 1-2 s per shot.',
+  'tip.pace.fast': 'Cuts are too fast to read or follow.',
+  'tip.format.aspect': 'Use full-screen 9:16: the native format for Reels, Shorts and TikTok.',
+  'tip.text.none': 'Add supporting text or captions: much of the viewing happens muted.',
+  'tip.text.coverage': 'Little on-screen text. Cover at least a third of the video with readable text.',
+  'tip.quality.dark': 'Dark footage. Raise exposure or add front light.',
+  'tip.quality.bright': 'Blown highlights. Lower exposure to recover detail.',
+  'tip.quality.soft': 'Low detail or blur. Avoid digital zoom and clean the lens.',
+  'tip.loop.diff': 'Ending does not match the opening. Close on a similar shot so the loop is seamless.',
+  'tip.loop.cta': 'Close with a clear call to action (save, comment, follow).',
+  'export.unsupported': 'This browser cannot record video. Try an updated Chrome or Edge.',
+  'export.hint': 'Recording happens in real time: it takes as long as the reel.',
+  'export.done': 'Video downloaded.',
+  'empty.preview': 'No media yet',
+  'lang.switch': 'ES',
+  'footer.privacy': 'All processing happens in your browser. No file is uploaded anywhere.',
+};
+
+const DICTS: Record<Lang, Dict> = { es, en };
+
+let current: Lang = 'es';
+
+export function setLang(l: Lang): void {
+  current = l;
+  localStorage.setItem('mai-reel-lang', l);
+  document.documentElement.lang = l;
+}
+
+export function getLang(): Lang {
+  return current;
+}
+
+export function t(key: string): string {
+  return DICTS[current][key] ?? DICTS.es[key] ?? key;
+}
