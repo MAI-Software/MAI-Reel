@@ -558,6 +558,137 @@ button {
   text-align: center;
 }
 
+
+/* ---------- block editor ---------- */
+
+.field textarea {
+  min-height: 96px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+
+.blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.block {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.block__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.block__thumb {
+  width: 34px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--muted);
+}
+
+.block__index {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.block__time {
+  font-size: 12px;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.block__spacer {
+  flex: 1;
+}
+
+.block__head .btn--icon {
+  min-height: 40px;
+  min-width: 40px;
+  padding: 8px;
+}
+
+.block__tag {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--fg-dim);
+}
+
+.block__tag--hook {
+  background: var(--primary);
+  color: #fff;
+}
+
+.block__tag--cta {
+  background: var(--accent);
+  color: #fff;
+}
+
+.block__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.block__grid label,
+.block__range {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+.block__range output {
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.block select,
+.block input[type='text'],
+.block input[type='number'] {
+  min-height: 44px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.block input[type='range'] {
+  accent-color: var(--primary);
+  height: 40px;
+}
+
+.panel--blocks #blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(70vh, 720px);
+  overflow-y: auto;
+}
+
+.stage__actions {
+  max-width: min(360px, 78vw);
+  width: 100%;
+}
+
 /* ---------- mobile tabs ---------- */
 
 .tabbar {
@@ -599,13 +730,15 @@ button {
   height: 20px;
 }
 
-body[data-tab='media'] .panel--score,
-body[data-tab='media'] .panel--edit,
-body[data-tab='edit'] .panel--media,
-body[data-tab='edit'] .panel--score,
-body[data-tab='score'] .panel--media,
-body[data-tab='score'] .panel--edit {
+body[data-tab] .panel {
   display: none;
+}
+
+body[data-tab='media'] .panel--media,
+body[data-tab='edit'] .panel--edit,
+body[data-tab='blocks'] .panel--blocks,
+body[data-tab='score'] .panel--score {
+  display: flex;
 }
 
 @media (min-width: 1024px) {
@@ -635,10 +768,11 @@ body[data-tab='score'] .panel--edit {
   .panel--edit {
     grid-column: 1;
   }
-  body[data-tab] .panel--media,
-  body[data-tab] .panel--edit,
-  body[data-tab] .panel--score {
+  body[data-tab] .panel {
     display: flex;
+  }
+  .panel--blocks {
+    grid-column: 3;
   }
   .viewport,
   .transport {

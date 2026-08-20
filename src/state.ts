@@ -1,4 +1,5 @@
 import type { MediaAsset, Project } from './types';
+import { DEFAULT_FONT, DEFAULT_STYLE } from './data/typography';
 
 export interface AppState {
   assets: MediaAsset[];
@@ -18,6 +19,8 @@ export const state: AppState = {
     template: 'punch',
     clips: [],
     texts: [],
+    fontId: DEFAULT_FONT,
+    styleId: DEFAULT_STYLE,
   },
   audio: null,
   time: 0,

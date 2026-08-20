@@ -9,6 +9,7 @@ export interface MediaAsset {
   width: number;
   height: number;
   srcDuration: number;
+  thumb?: string;
 }
 
 export type Effect = 'none' | 'zoom-in' | 'zoom-out' | 'pan-left' | 'pan-right';
@@ -35,6 +36,8 @@ export interface TextOverlay {
   role: TextRole;
   y: number;
   size: number;
+  fontId: string;
+  styleId: string;
 }
 
 export interface Project {
@@ -43,4 +46,6 @@ export interface Project {
   template: TemplateId;
   clips: Clip[];
   texts: TextOverlay[];
+  fontId: string;
+  styleId: string;
 }

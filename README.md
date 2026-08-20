@@ -9,6 +9,11 @@ Todo el procesamiento ocurre en el navegador: ningún archivo se sube a ningún 
 - **Importación**: imágenes (JPG/PNG/WebP) y vídeo (MP4/MOV/WebM) por selector o arrastrando.
 - **Montaje automático**: tres plantillas de ritmo — `Punch` (cortes rápidos), `Flow` (medio), `Story` (narrativo). Reparte duraciones, alterna efectos Ken Burns (zoom in/out, paneos) y transiciones (corte, fundido, zoom, slide). Con pocas fotos, `Punch` recicla el material para mantener la cadencia; `Flow` y `Story` alargan cada plano.
 - **Textos**: gancho inicial y llamada a la acción final, con contorno legible y respeto de las zonas seguras del formato.
+- **Subtítulos automáticos**: pegas el guion y se reparte en bloques cronometrados (~34 caracteres) repartidos por la duración del reel, entre el gancho y el CTA.
+- **Tipografías**: Anton, Bebas Neue, Montserrat, Poppins, Archivo Black y Atkinson Hyperlegible, con corrección óptica de tamaño por familia.
+- **Estilos de texto**: Outline, Box, Pop, Neon, Bar y Clean (relleno, contorno, fondo, glow, mayúsculas y tracking).
+- **Edición por bloques**: cada plano se retoca por separado (efecto, transición de entrada, duración, punto de inicio del vídeo, reordenar, eliminar) y cada texto también (contenido, fuente, estilo, posición, tamaño, entrada y salida).
+- **Material acumulable**: puedes añadir más fotos o vídeos en cualquier momento y se anexan al final sin perder las ediciones manuales. `Regenerar montaje` sí rehace todo desde cero.
 - **Formatos**: 9:16 (1080×1920), 4:5 y 1:1.
 - **Audio**: pista propia opcional (se mezcla en la exportación).
 - **Exportación**: grabación del canvas en tiempo real (`MediaRecorder`), MP4 si el navegador lo soporta, si no WebM.
@@ -62,4 +67,4 @@ Conectar el repositorio y usar:
 
 ## Licencia
 
-MIT — MAI Softwares.
+MIT — MAI Softwares. Software y web gratuitos, sin cuenta, sin límites de uso y sin subida de archivos.

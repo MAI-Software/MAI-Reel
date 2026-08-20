@@ -1,17 +1,31 @@
 import './styles.css';
-import { state, assetById } from './state';
+import { state, assetById, uid } from './state';
 import { setLang, t, SOURCES } from './i18n';
 import { icons, brandMark } from './ui/icons';
 import { loadFiles, thumbnail } from './engine/media';
-import { buildProject, relayout, TEMPLATES } from './engine/autoedit';
+import { buildProject, relayout, appendAssets, buildCaptions, TEMPLATES } from './engine/autoedit';
 import { ReelRenderer, SIZES, totalDuration } from './engine/render';
 import { Player } from './engine/player';
 import { recordCanvas, downloadBlob, extensionFor, pickMime } from './engine/export';
 import { analyzeMedia } from './analysis/frames';
 import { scoreProject, type ScoreResult } from './analysis/score';
-import type { Aspect, TemplateId } from './types';
+import { FONTS, TEXT_STYLES, ensureFontsLoaded } from './data/typography';
+import type { Aspect, Effect, TemplateId, TextOverlay, Transition } from './types';
+
+const EFFECTS: Effect[] = ['none', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'];
+const TRANSITIONS: Transition[] = ['cut', 'fade', 'zoom', 'slide'];
+const POSITIONS: Array<{ id: string; y: number }> = [
+  { id: 'top', y: 0.24 },
+  { id: 'mid', y: 0.5 },
+  { id: 'bottom', y: 0.74 },
+];
 
 const app = document.getElementById('app')!;
+
+const options = (values: string[], selected: string, labelKey: (v: string) => string) =>
+  values
+    .map((v) => `<option value="${v}" ${v === selected ? 'selected' : ''}>${t(labelKey(v))}</option>`)
+    .join('');
 
 function shell(): string {
   return `
@@ -46,7 +60,7 @@ function shell(): string {
         <input type="range" id="scrub" min="0" max="1" step="0.02" value="0" aria-label="timeline" />
         <span class="time" id="time">0.0 / 0.0s</span>
       </div>
-      <div class="row" style="max-width:min(360px,78vw);width:100%">
+      <div class="row stage__actions">
         <button class="btn btn--accent" id="export">${icons.download}<span data-i18n="action.export"></span></button>
         <label class="toggle"><input type="checkbox" id="safe" /><span data-i18n="safe.label"></span></label>
       </div>
@@ -76,12 +90,26 @@ function shell(): string {
         <input type="range" id="target" min="5" max="45" step="1" value="12" />
       </div>
       <div class="field">
+        <label for="font" data-i18n="font.label"></label>
+        <select id="font">${FONTS.map((f) => `<option value="${f.id}" style="font-family:${f.family}">${f.label}</option>`).join('')}</select>
+      </div>
+      <div class="field">
+        <label for="style" data-i18n="style.label"></label>
+        <select id="style">${TEXT_STYLES.map((s) => `<option value="${s.id}">${s.label}</option>`).join('')}</select>
+      </div>
+      <div class="field">
         <label for="hook" data-i18n="hook.label"></label>
         <input type="text" id="hook" maxlength="80" />
       </div>
       <div class="field">
         <label for="cta" data-i18n="cta.label"></label>
         <input type="text" id="cta" maxlength="60" />
+      </div>
+      <div class="field">
+        <label for="script" data-i18n="script.label"></label>
+        <textarea id="script" rows="4"></textarea>
+        <span class="empty-note" data-i18n="script.hint"></span>
+        <button class="btn" id="captions">${icons.captions}<span data-i18n="script.generate"></span></button>
       </div>
       <div class="field">
         <label data-i18n="audio.label"></label>
@@ -93,6 +121,12 @@ function shell(): string {
         <input type="file" id="audioFile" accept="audio/*" hidden />
       </div>
       <button class="btn btn--primary" id="rebuild">${icons.wand}<span data-i18n="action.rebuild"></span></button>
+      <span class="empty-note" data-i18n="action.rebuildWarn"></span>
+    </section>
+
+    <section class="panel panel--blocks" aria-label="blocks">
+      <h2 class="panel__title" data-i18n="nav.blocks"></h2>
+      <div id="blocks"></div>
     </section>
 
     <section class="panel panel--score" aria-label="score">
@@ -110,6 +144,7 @@ function shell(): string {
   <nav class="tabbar" role="tablist">
     <button role="tab" data-goto="media" aria-selected="true">${icons.image}<span data-i18n="nav.media"></span></button>
     <button role="tab" data-goto="edit" aria-selected="false">${icons.sliders}<span data-i18n="nav.edit"></span></button>
+    <button role="tab" data-goto="blocks" aria-selected="false">${icons.layers}<span data-i18n="nav.blocks"></span></button>
     <button role="tab" data-goto="score" aria-selected="false">${icons.target}<span data-i18n="nav.score"></span></button>
   </nav>`;
 }
@@ -121,6 +156,7 @@ const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) 
 const viewport = $('viewport');
 const viewportEmpty = $('viewportEmpty');
 const strip = $('strip');
+const blocksBox = $('blocks');
 const scrub = $<HTMLInputElement>('scrub');
 const timeLabel = $('time');
 const playBtn = $('play');
@@ -129,8 +165,11 @@ const analyzeBtn = $<HTMLButtonElement>('analyze');
 const scoreBody = $('scoreBody');
 const hookInput = $<HTMLInputElement>('hook');
 const ctaInput = $<HTMLInputElement>('cta');
+const scriptInput = $<HTMLTextAreaElement>('script');
 const templateSel = $<HTMLSelectElement>('template');
 const aspectSel = $<HTMLSelectElement>('aspect');
+const fontSel = $<HTMLSelectElement>('font');
+const styleSel = $<HTMLSelectElement>('style');
 const targetRange = $<HTMLInputElement>('target');
 
 const renderer = new ReelRenderer(state.project.aspect);
@@ -160,8 +199,10 @@ function applyI18n(): void {
   }
   hookInput.placeholder = t('hook.placeholder');
   ctaInput.placeholder = t('cta.placeholder');
+  scriptInput.placeholder = t('script.placeholder');
   renderScore();
   renderStrip();
+  renderBlocks();
 }
 
 /* ---------- media ---------- */
@@ -169,13 +210,23 @@ function applyI18n(): void {
 async function addFiles(files: File[]): Promise<void> {
   const added = await loadFiles(files);
   if (!added.length) return;
+  const hadClips = state.project.clips.length > 0;
   state.assets.push(...added);
-  rebuild();
+  if (hadClips) {
+    appendAssets(state.project, added);
+    scoreStale = true;
+    player.seek(state.time);
+    updateTransport();
+  } else {
+    rebuild();
+  }
   renderStrip();
+  renderBlocks();
   for (const a of added) {
-    const src = await thumbnail(a);
-    const img = strip.querySelector<HTMLImageElement>(`img[data-id="${a.id}"]`);
-    if (img) img.src = src;
+    a.thumb = await thumbnail(a);
+    for (const img of Array.from(document.querySelectorAll<HTMLImageElement>(`img[data-id="${a.id}"]`))) {
+      img.src = a.thumb;
+    }
   }
 }
 
@@ -183,9 +234,9 @@ function renderStrip(): void {
   strip.innerHTML = state.assets
     .map(
       (a) => `<div class="thumb">
-        <img data-id="${a.id}" alt="${a.name}" />
+        <img data-id="${a.id}" src="${a.thumb ?? ''}" alt="${a.name}" />
         <span class="thumb__badge">${a.kind === 'video' ? `${a.srcDuration.toFixed(1)}s` : 'IMG'}</span>
-        <button class="thumb__del" data-del="${a.id}" aria-label="remove">${icons.close}</button>
+        <button class="thumb__del" data-del="${a.id}" aria-label="${t('clip.delete')}">${icons.close}</button>
       </div>`,
     )
     .join('');
@@ -193,7 +244,7 @@ function renderStrip(): void {
   viewportEmpty.style.display = state.assets.length ? 'none' : 'grid';
 }
 
-/* ---------- build / playback ---------- */
+/* ---------- build ---------- */
 
 function rebuild(): void {
   const aspect = aspectSel.value as Aspect;
@@ -202,16 +253,31 @@ function rebuild(): void {
     aspect,
     hook: hookInput.value.trim() || undefined,
     cta: ctaInput.value.trim() || undefined,
+    script: scriptInput.value.trim() || undefined,
     target: Number(targetRange.value),
+    fontId: fontSel.value,
+    styleId: styleSel.value,
   });
   relayout(state.project);
-  renderer.resize(aspect);
-  const [w, h] = SIZES[aspect];
-  viewport.style.aspectRatio = `${w} / ${h}`;
+  applyAspect(aspect);
   scoreStale = true;
   player.seek(0);
   updateTransport();
   renderScore();
+  renderBlocks();
+}
+
+function applyAspect(aspect: Aspect): void {
+  renderer.resize(aspect);
+  const [w, h] = SIZES[aspect];
+  viewport.style.aspectRatio = `${w} / ${h}`;
+}
+
+function touch(): void {
+  relayout(state.project);
+  scoreStale = true;
+  player.seek(Math.min(state.time, totalDuration(state.project)));
+  updateTransport();
 }
 
 function updateTransport(): void {
@@ -224,6 +290,164 @@ function updateTransport(): void {
   exportBtn.disabled = !state.assets.length;
   analyzeBtn.disabled = !state.assets.length || analyzing;
 }
+
+/* ---------- blocks ---------- */
+
+function posOf(y: number): string {
+  return POSITIONS.reduce((best, p) => (Math.abs(p.y - y) < Math.abs(best.y - y) ? p : best), POSITIONS[0]!).id;
+}
+
+function clipCard(index: number): string {
+  const clip = state.project.clips[index]!;
+  const asset = assetById(clip.assetId);
+  const isVideo = asset?.kind === 'video';
+  const maxIn = isVideo ? Math.max(0, (asset?.srcDuration ?? 0) - clip.duration) : 0;
+  return `<article class="block" data-clip="${clip.id}">
+    <div class="block__head">
+      <img class="block__thumb" data-id="${clip.assetId}" src="${asset?.thumb ?? ''}" alt="" />
+      <span class="block__index">${index + 1}</span>
+      <span class="block__time">${clip.start.toFixed(1)}s</span>
+      <span class="block__spacer"></span>
+      <button class="btn btn--icon btn--ghost" data-move="up" aria-label="${t('clip.up')}" ${index === 0 ? 'disabled' : ''}>${icons.up}</button>
+      <button class="btn btn--icon btn--ghost" data-move="down" aria-label="${t('clip.down')}" ${index === state.project.clips.length - 1 ? 'disabled' : ''}>${icons.down}</button>
+      <button class="btn btn--icon btn--ghost" data-remove aria-label="${t('clip.delete')}">${icons.trash}</button>
+    </div>
+    <div class="block__grid">
+      <label>${t('clip.effect')}
+        <select data-field="effect">${options(EFFECTS, clip.effect, (v) => `effect.${v}`)}</select>
+      </label>
+      <label>${t('clip.transition')}
+        <select data-field="transition">${options(TRANSITIONS, clip.transition, (v) => `trans.${v}`)}</select>
+      </label>
+    </div>
+    <label class="block__range">${t('clip.duration')} <output>${clip.duration.toFixed(1)}s</output>
+      <input type="range" data-field="duration" min="0.4" max="${isVideo ? Math.max(2, asset?.srcDuration ?? 8).toFixed(1) : 8}" step="0.1" value="${clip.duration}" />
+    </label>
+    ${
+      isVideo && maxIn > 0.1
+        ? `<label class="block__range">${t('clip.trim')} <output>${clip.srcIn.toFixed(1)}s</output>
+      <input type="range" data-field="srcIn" min="0" max="${maxIn.toFixed(1)}" step="0.1" value="${clip.srcIn}" />
+    </label>`
+        : ''
+    }
+  </article>`;
+}
+
+function textCard(o: TextOverlay): string {
+  const dur = totalDuration(state.project);
+  return `<article class="block" data-text="${o.id}">
+    <div class="block__head">
+      <span class="block__tag block__tag--${o.role}">${t(`role.${o.role}`)}</span>
+      <span class="block__time">${o.start.toFixed(1)}-${o.end.toFixed(1)}s</span>
+      <span class="block__spacer"></span>
+      <button class="btn btn--icon btn--ghost" data-remove aria-label="${t('clip.delete')}">${icons.trash}</button>
+    </div>
+    <input type="text" data-field="text" value="${o.text.replace(/"/g, '&quot;')}" aria-label="${t('role.' + o.role)}" />
+    <div class="block__grid">
+      <label>${t('font.label')}
+        <select data-field="fontId">${FONTS.map((f) => `<option value="${f.id}" ${f.id === o.fontId ? 'selected' : ''}>${f.label}</option>`).join('')}</select>
+      </label>
+      <label>${t('style.label')}
+        <select data-field="styleId">${TEXT_STYLES.map((s) => `<option value="${s.id}" ${s.id === o.styleId ? 'selected' : ''}>${s.label}</option>`).join('')}</select>
+      </label>
+      <label>${t('text.pos')}
+        <select data-field="pos">${POSITIONS.map((p) => `<option value="${p.id}" ${p.id === posOf(o.y) ? 'selected' : ''}>${t(`pos.${p.id}`)}</option>`).join('')}</select>
+      </label>
+      <label>${t('text.size')}
+        <input type="number" data-field="size" min="28" max="140" step="2" value="${Math.round(o.size)}" />
+      </label>
+      <label>${t('text.start')}
+        <input type="number" data-field="start" min="0" max="${dur.toFixed(1)}" step="0.1" value="${o.start.toFixed(1)}" />
+      </label>
+      <label>${t('text.end')}
+        <input type="number" data-field="end" min="0" max="${dur.toFixed(1)}" step="0.1" value="${o.end.toFixed(1)}" />
+      </label>
+    </div>
+  </article>`;
+}
+
+function renderBlocks(): void {
+  if (!state.project.clips.length) {
+    blocksBox.innerHTML = `<p class="empty-note">${t('blocks.empty')}</p>`;
+    return;
+  }
+  blocksBox.innerHTML = `
+    <h3 class="panel__title">${t('blocks.clips')}</h3>
+    <div class="blocks">${state.project.clips.map((_, i) => clipCard(i)).join('')}</div>
+    <h3 class="panel__title" style="margin-top:16px">${t('blocks.texts')}</h3>
+    <div class="blocks">${state.project.texts.map(textCard).join('')}</div>
+    <button class="btn" id="addText">${icons.plus}<span>${t('blocks.addText')}</span></button>`;
+}
+
+blocksBox.addEventListener('click', (e) => {
+  const target = e.target as HTMLElement;
+  if (target.closest('#addText')) {
+    const dur = totalDuration(state.project);
+    state.project.texts.push({
+      id: uid('t'),
+      text: 'Texto',
+      start: Math.min(state.time, Math.max(0, dur - 1.5)),
+      end: Math.min(dur, Math.max(1.5, state.time + 2.2)),
+      role: 'caption',
+      y: 0.74,
+      size: 56,
+      fontId: fontSel.value,
+      styleId: styleSel.value,
+    });
+    touch();
+    renderBlocks();
+    return;
+  }
+  const card = target.closest<HTMLElement>('[data-clip],[data-text]');
+  if (!card) return;
+
+  if (target.closest('[data-remove]')) {
+    if (card.dataset.clip) state.project.clips = state.project.clips.filter((c) => c.id !== card.dataset.clip);
+    else state.project.texts = state.project.texts.filter((x) => x.id !== card.dataset.text);
+    touch();
+    renderBlocks();
+    return;
+  }
+  const move = target.closest<HTMLElement>('[data-move]');
+  if (move && card.dataset.clip) {
+    const i = state.project.clips.findIndex((c) => c.id === card.dataset.clip);
+    const j = move.dataset.move === 'up' ? i - 1 : i + 1;
+    if (j < 0 || j >= state.project.clips.length) return;
+    const clips = state.project.clips;
+    [clips[i], clips[j]] = [clips[j]!, clips[i]!];
+    touch();
+    renderBlocks();
+  }
+});
+
+blocksBox.addEventListener('input', (e) => {
+  const input = e.target as HTMLInputElement | HTMLSelectElement;
+  const field = input.dataset.field;
+  const card = input.closest<HTMLElement>('[data-clip],[data-text]');
+  if (!field || !card) return;
+
+  if (card.dataset.clip) {
+    const clip = state.project.clips.find((c) => c.id === card.dataset.clip);
+    if (!clip) return;
+    if (field === 'effect') clip.effect = input.value as Effect;
+    if (field === 'transition') clip.transition = input.value as Transition;
+    if (field === 'duration') clip.duration = Number(input.value);
+    if (field === 'srcIn') clip.srcIn = Number(input.value);
+    const out = input.parentElement?.querySelector('output');
+    if (out) out.textContent = `${Number(input.value).toFixed(1)}s`;
+  } else {
+    const o = state.project.texts.find((x) => x.id === card.dataset.text);
+    if (!o) return;
+    if (field === 'text') o.text = input.value;
+    if (field === 'fontId') o.fontId = input.value;
+    if (field === 'styleId') o.styleId = input.value;
+    if (field === 'size') o.size = Number(input.value);
+    if (field === 'start') o.start = Number(input.value);
+    if (field === 'end') o.end = Math.max(Number(input.value), o.start + 0.3);
+    if (field === 'pos') o.y = POSITIONS.find((p) => p.id === input.value)?.y ?? o.y;
+  }
+  touch();
+});
 
 /* ---------- score ---------- */
 
@@ -343,20 +567,19 @@ async function exportVideo(): Promise<void> {
   try {
     player.pause();
     player.seek(0);
-    await document.fonts.ready;
+    await ensureFontsLoaded();
     const { blob, mime } = await recordCanvas({
       canvas: renderer.canvas,
       fps: state.project.fps,
       audio: state.audio?.el ?? null,
       run: () =>
         new Promise<void>((resolve) => {
-          const done = () => {
+          const iv = setInterval(() => {
             if (!player.playing) {
               clearInterval(iv);
               resolve();
             }
-          };
-          const iv = setInterval(done, 120);
+          }, 120);
           player.play();
         }),
     });
@@ -406,8 +629,10 @@ strip.addEventListener('click', (e) => {
   const asset = assetById(id);
   if (asset) URL.revokeObjectURL(asset.url);
   state.assets = state.assets.filter((a) => a.id !== id);
-  rebuild();
+  state.project.clips = state.project.clips.filter((c) => c.assetId !== id);
+  touch();
   renderStrip();
+  renderBlocks();
 });
 
 $('clear').addEventListener('click', () => {
@@ -435,12 +660,25 @@ $('safe').addEventListener('change', (e) => {
   player.seek(state.time);
 });
 
-for (const id of ['template', 'aspect', 'target', 'hook', 'cta']) {
-  $(id).addEventListener('change', () => {
-    if (id === 'target') $('targetVal').textContent = `${targetRange.value}s`;
-    rebuild();
+aspectSel.addEventListener('change', () => {
+  state.project.aspect = aspectSel.value as Aspect;
+  applyAspect(state.project.aspect);
+  touch();
+});
+
+for (const sel of [fontSel, styleSel]) {
+  sel.addEventListener('change', () => {
+    state.project.fontId = fontSel.value;
+    state.project.styleId = styleSel.value;
+    for (const o of state.project.texts) {
+      o.fontId = fontSel.value;
+      o.styleId = styleSel.value;
+    }
+    touch();
+    renderBlocks();
   });
 }
+
 targetRange.addEventListener('input', () => {
   $('targetVal').textContent = `${targetRange.value}s`;
 });
@@ -448,6 +686,20 @@ templateSel.addEventListener('change', () => {
   targetRange.value = String(TEMPLATES[templateSel.value as TemplateId].target);
   $('targetVal').textContent = `${targetRange.value}s`;
   rebuild();
+});
+
+$('captions').addEventListener('click', () => {
+  const script = scriptInput.value.trim();
+  if (!script || !state.project.clips.length) return;
+  state.project.texts = state.project.texts.filter((x) => x.role !== 'caption');
+  const dur = totalDuration(state.project);
+  const from = state.project.texts.find((x) => x.role === 'hook')?.end ?? 0;
+  const to = Math.max(from + 1, dur - (state.project.texts.some((x) => x.role === 'cta') ? 2.4 : 0));
+  const captions = buildCaptions(script, from, to, fontSel.value, styleSel.value);
+  state.project.texts.push(...captions);
+  touch();
+  renderBlocks();
+  toast(`${captions.length} ${t('toast.captions')}`);
 });
 
 $('rebuild').addEventListener('click', () => {
@@ -485,10 +737,12 @@ document.querySelectorAll<HTMLButtonElement>('[data-goto]').forEach((btn) => {
 });
 
 window.addEventListener('keydown', (e) => {
-  if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'SELECT') return;
+  const tag = (e.target as HTMLElement)?.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
   if (e.code === 'Space') {
     e.preventDefault();
-    player.playing ? player.pause() : player.play();
+    if (player.playing) player.pause();
+    else player.play();
     updateTransport();
   }
 });
@@ -496,7 +750,10 @@ window.addEventListener('keydown', (e) => {
 /* ---------- boot ---------- */
 
 document.body.dataset.tab = 'media';
+fontSel.value = state.project.fontId;
+styleSel.value = state.project.styleId;
 applyI18n();
 rebuild();
 renderStrip();
 updateTransport();
+void ensureFontsLoaded().then(() => player.seek(state.time));

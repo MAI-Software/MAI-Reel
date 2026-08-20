@@ -1,4 +1,5 @@
 import type { Aspect, Effect, MediaAsset, Project, TextOverlay } from '../types';
+import { fontCss, styleById } from '../data/typography';
 
 export const SIZES: Record<Aspect, [number, number]> = {
   '9:16': [1080, 1920],
@@ -120,12 +121,15 @@ export class ReelRenderer {
     const dw = this.canvas.width;
     const dh = this.canvas.height;
     const size = o.size;
-    const isHook = o.role === 'hook';
-    ctx.font = `700 ${size}px "Atkinson Hyperlegible", system-ui, sans-serif`;
+    const style = styleById(o.styleId);
+    ctx.font = fontCss(o.fontId, size);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    if (style.tracking && 'letterSpacing' in ctx) {
+      (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${size * style.tracking}px`;
+    }
     const maxW = dw * (1 - SAFE.side * 2) - 40;
-    const text = isHook ? o.text.toUpperCase() : o.text;
+    const text = style.uppercase ? o.text.toUpperCase() : o.text;
     const lines = wrapText(ctx, text, maxW);
     const lh = size * 1.22;
     const blockH = lines.length * lh;
@@ -137,25 +141,33 @@ export class ReelRenderer {
     ctx.save();
     ctx.globalAlpha = ease;
     ctx.translate(0, (1 - ease) * 18);
-    if (o.role === 'caption' || o.role === 'cta') {
+    if (style.bg) {
       const padX = size * 0.5;
       const padY = size * 0.34;
       const wBox = Math.max(...lines.map((l) => ctx.measureText(l).width)) + padX * 2;
-      ctx.fillStyle = o.role === 'cta' ? '#EC4899' : 'rgba(4,7,18,0.62)';
+      ctx.fillStyle = style.bg;
       roundRect(ctx, (dw - wBox) / 2, top - padY, wBox, blockH + padY * 2, size * 0.28);
       ctx.fill();
     }
     lines.forEach((line, i) => {
       const y = top + lh * i + lh / 2;
-      if (isHook) {
-        ctx.lineWidth = size * 0.16;
-        ctx.strokeStyle = 'rgba(4,7,18,0.9)';
+      if (style.stroke) {
+        ctx.lineWidth = size * (style.strokeWidth ?? 0.14);
+        ctx.strokeStyle = style.stroke;
         ctx.lineJoin = 'round';
         ctx.strokeText(line, dw / 2, y);
       }
-      ctx.fillStyle = '#FFFFFF';
+      if (style.glow) {
+        ctx.shadowColor = style.glow.color;
+        ctx.shadowBlur = size * style.glow.blur;
+      }
+      ctx.fillStyle = style.fill;
       ctx.fillText(line, dw / 2, y);
+      ctx.shadowBlur = 0;
     });
+    if ('letterSpacing' in ctx) {
+      (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0px';
+    }
     ctx.restore();
   }
 
