@@ -127,6 +127,17 @@ const es: Dict = {
   'script.hint': 'Se divide en bloques de ~34 caracteres repartidos por la duración del reel.',
   'toast.captions': 'subtítulos generados',
   'action.rebuildWarn': 'Regenerar descarta las ediciones manuales.',
+  'media.processing': 'Procesando',
+  'onboard.1': 'Suelta fotos o vídeos.',
+  'onboard.2': 'Elige ritmo, texto y estilo.',
+  'onboard.3': 'Mira el score y exporta.',
+  'block.seek': 'Ir a este bloque',
+  'blocks.newText': 'Texto nuevo',
+  'score.updating': 'Recalculando…',
+  'score.stale': 'Pendiente de recalcular',
+  'footer.matriz': 'Web matriz del estudio',
+  'footer.site': 'mai-softwares.com',
+  'footer.license': 'MIT · gratis, sin cuenta',
 };
 
 const en: Dict = {
@@ -236,6 +247,17 @@ const en: Dict = {
   'script.hint': 'Split into ~34-character blocks spread across the reel duration.',
   'toast.captions': 'captions generated',
   'action.rebuildWarn': 'Rebuilding discards manual edits.',
+  'media.processing': 'Processing',
+  'onboard.1': 'Drop photos or videos.',
+  'onboard.2': 'Pick pacing, text and style.',
+  'onboard.3': 'Check the score and export.',
+  'block.seek': 'Jump to this block',
+  'blocks.newText': 'New text',
+  'score.updating': 'Recomputing…',
+  'score.stale': 'Needs recompute',
+  'footer.matriz': 'Studio parent site',
+  'footer.site': 'mai-softwares.com',
+  'footer.license': 'MIT · free, no account',
 };
 
 const DICTS: Record<Lang, Dict> = { es, en };

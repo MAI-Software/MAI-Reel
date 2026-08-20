@@ -75,21 +75,38 @@ export class ReelRenderer {
   private snap: HTMLCanvasElement;
   private snapCtx: CanvasRenderingContext2D;
   private lastIndex = -1;
+  private aspect: Aspect;
+  /** Render scale: the preview runs at a fraction of the export resolution to stay smooth on phones. */
+  private scale = 1;
 
-  constructor(aspect: Aspect = '9:16') {
+  constructor(aspect: Aspect = '9:16', scale = 1) {
     this.canvas = document.createElement('canvas');
     this.snap = document.createElement('canvas');
     this.ctx = this.canvas.getContext('2d', { alpha: false })!;
     this.snapCtx = this.snap.getContext('2d', { alpha: false })!;
+    this.aspect = aspect;
+    this.scale = scale;
     this.resize(aspect);
   }
 
+  /** Design units are authored against a 1080px-wide frame. */
+  private get unit(): number {
+    return this.canvas.width / 1080;
+  }
+
+  setScale(scale: number): void {
+    if (this.scale === scale) return;
+    this.scale = scale;
+    this.resize(this.aspect);
+  }
+
   resize(aspect: Aspect): void {
+    this.aspect = aspect;
     const [w, h] = SIZES[aspect];
-    this.canvas.width = w;
-    this.canvas.height = h;
-    this.snap.width = w;
-    this.snap.height = h;
+    this.canvas.width = Math.round(w * this.scale);
+    this.canvas.height = Math.round(h * this.scale);
+    this.snap.width = this.canvas.width;
+    this.snap.height = this.canvas.height;
     this.lastIndex = -1;
   }
 
@@ -120,7 +137,7 @@ export class ReelRenderer {
     const { ctx } = this;
     const dw = this.canvas.width;
     const dh = this.canvas.height;
-    const size = o.size;
+    const size = o.size * this.unit;
     const style = styleById(o.styleId);
     ctx.font = fontCss(o.fontId, size);
     ctx.textAlign = 'center';
@@ -128,7 +145,7 @@ export class ReelRenderer {
     if (style.tracking && 'letterSpacing' in ctx) {
       (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${size * style.tracking}px`;
     }
-    const maxW = dw * (1 - SAFE.side * 2) - 40;
+    const maxW = dw * (1 - SAFE.side * 2) - 40 * this.unit;
     const text = style.uppercase ? o.text.toUpperCase() : o.text;
     const lines = wrapText(ctx, text, maxW);
     const lh = size * 1.22;
@@ -136,11 +153,12 @@ export class ReelRenderer {
     const appear = Math.min(1, Math.max(0, (t - o.start) / 0.22));
     const ease = appear * appear * (3 - 2 * appear);
     let top = o.y * dh - blockH / 2;
-    top = Math.max(dh * SAFE.top + 20, Math.min(top, dh * (1 - SAFE.bottom) - blockH - 20));
+    const margin = 20 * this.unit;
+    top = Math.max(dh * SAFE.top + margin, Math.min(top, dh * (1 - SAFE.bottom) - blockH - margin));
 
     ctx.save();
     ctx.globalAlpha = ease;
-    ctx.translate(0, (1 - ease) * 18);
+    ctx.translate(0, (1 - ease) * 18 * this.unit);
     if (style.bg) {
       const padX = size * 0.5;
       const padY = size * 0.34;
@@ -180,8 +198,8 @@ export class ReelRenderer {
     ctx.fillRect(0, 0, dw, dh * SAFE.top);
     ctx.fillRect(0, dh * (1 - SAFE.bottom), dw, dh * SAFE.bottom);
     ctx.strokeStyle = 'rgba(236,72,153,0.9)';
-    ctx.setLineDash([18, 14]);
-    ctx.lineWidth = 4;
+    ctx.setLineDash([18 * this.unit, 14 * this.unit]);
+    ctx.lineWidth = 4 * this.unit;
     ctx.strokeRect(dw * SAFE.side, dh * SAFE.top, dw * (1 - SAFE.side * 2), dh * (1 - SAFE.top - SAFE.bottom));
     ctx.restore();
   }

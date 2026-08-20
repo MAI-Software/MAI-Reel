@@ -41,6 +41,17 @@ Cada punto perdido genera un consejo concreto, ordenado por puntos perdidos y en
 - [YouTube Help](https://support.google.com/youtube)
 - [W3C WCAG 2.1 — Contrast (Minimum)](https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html)
 
+## Interfaz
+
+- **Header sticky** con marca, chip de score en vivo (toca para saltar al desglose) y cambio de idioma; se compacta al hacer scroll.
+- **Preview pegajoso en móvil**: el reel queda anclado bajo la cabecera mientras editas bloques, así ves el cambio sin volver arriba.
+- **Barra de tiempo con marcas** de cada corte, atajos de teclado (espacio = play/pausa, flechas = ±0,2 s) y salto directo desde cada bloque.
+- **Score automático**: se recalcula solo 1,4 s después de cada edición; el chip avisa cuando está pendiente.
+- **Estados**: onboarding de 3 pasos en el visor vacío, barra de progreso al importar, porcentaje real durante la exportación y avisos en `aria-live`.
+- **Navegación**: pestañas en móvil con contadores, flechas del teclado y `#hash` en la URL para compartir sección; tres columnas en escritorio.
+- **Rendimiento**: la previsualización se renderiza al 45-60 % de la resolución final y sube a 1080×1920 solo al exportar.
+- Objetivos táctiles ≥44 px, foco visible, `prefers-reduced-motion` respetado y contraste verificado en oscuro.
+
 ## Stack
 
 Vite + TypeScript, sin framework ni dependencias en runtime. Canvas 2D para el render, `MediaRecorder` para exportar, Web Audio para mezclar audio.
@@ -64,6 +75,10 @@ Conectar el repositorio y usar:
 - La exportación graba en tiempo real: un reel de 15 s tarda 15 s en generarse.
 - Un vídeo importado se usa como un único plano continuo (sin cortes internos automáticos).
 - El análisis de imagen no detecta caras ni objetos; mide luz, contraste, nitidez, color y movimiento.
+
+## Créditos
+
+Hecho por [MAI Softwares](https://mai-softwares.com) — la web matriz enlazada desde el pie de la app.
 
 ## Licencia
 

@@ -12,6 +12,11 @@ import { scoreProject, type ScoreResult } from './analysis/score';
 import { FONTS, TEXT_STYLES, ensureFontsLoaded } from './data/typography';
 import type { Aspect, Effect, TemplateId, TextOverlay, Transition } from './types';
 
+const PARENT_SITE = 'https://mai-softwares.com';
+const REPO = 'https://github.com/MAI-Software/MAI-Reel';
+const TABS = ['media', 'edit', 'blocks', 'score'] as const;
+type Tab = (typeof TABS)[number];
+
 const EFFECTS: Effect[] = ['none', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'];
 const TRANSITIONS: Transition[] = ['cut', 'fade', 'zoom', 'slide'];
 const POSITIONS: Array<{ id: string; y: number }> = [
@@ -19,6 +24,11 @@ const POSITIONS: Array<{ id: string; y: number }> = [
   { id: 'mid', y: 0.5 },
   { id: 'bottom', y: 0.74 },
 ];
+/** The preview renders at a fraction of the export resolution so phones keep 30fps. */
+const wideScreen = window.matchMedia('(min-width: 1024px)');
+const previewScale = (): number => (wideScreen.matches ? 0.6 : 0.45);
+const AUTO_ANALYZE_MS = 1400;
+const AUTO_ANALYZE_MAX_CLIPS = 24;
 
 const app = document.getElementById('app')!;
 
@@ -29,35 +39,53 @@ const options = (values: string[], selected: string, labelKey: (v: string) => st
 
 function shell(): string {
   return `
-  <header class="topbar">
-    <div class="brand">${brandMark}<span class="brand__name">MAI<span>-Reel</span></span></div>
+  <header class="topbar" id="topbar">
+    <a class="brand" href="${PARENT_SITE}" target="_blank" rel="noopener noreferrer" title="MAI Softwares">
+      ${brandMark}<span class="brand__name">MAI<span>-Reel</span></span>
+    </a>
     <span class="topbar__tag" data-i18n="app.tagline"></span>
     <span class="topbar__spacer"></span>
-    <button class="btn btn--ghost" id="lang" aria-label="Language"><span data-i18n="lang.switch"></span></button>
+    <button class="chip chip--score" id="scoreChip" hidden>
+      ${icons.target}<strong id="scoreChipVal">--</strong><small>/100</small>
+    </button>
+    <button class="btn btn--ghost btn--sm" id="lang" aria-label="Language"><span data-i18n="lang.switch"></span></button>
   </header>
 
   <main class="layout">
-    <section class="panel panel--media" aria-label="media">
+    <section class="panel panel--media" aria-label="media" id="panel-media">
       <div class="dropzone" id="drop">
         <h2 data-i18n="drop.title"></h2>
         <p data-i18n="drop.hint"></p>
         <button class="btn btn--primary" id="pick">${icons.image}<span data-i18n="drop.button"></span></button>
         <input type="file" id="file" accept="image/*,video/*" multiple hidden />
       </div>
+      <div class="progress" id="importProgress" hidden>
+        <div class="progress__track"><span class="progress__bar" id="importBar"></span></div>
+        <span class="progress__label" id="importLabel"></span>
+      </div>
       <div class="strip" id="strip"></div>
-      <div class="row">
+      <div class="row row--between">
         <span class="empty-note" id="mediaCount"></span>
-        <button class="btn btn--ghost" id="clear">${icons.trash}<span data-i18n="media.clear"></span></button>
+        <button class="btn btn--ghost btn--sm" id="clear">${icons.trash}<span data-i18n="media.clear"></span></button>
       </div>
     </section>
 
-    <section class="stage">
+    <section class="stage" id="stage">
       <div class="viewport" id="viewport">
-        <div class="viewport__empty" id="viewportEmpty" data-i18n="empty.preview"></div>
+        <div class="viewport__empty" id="viewportEmpty">
+          <ol class="steps">
+            <li data-i18n="onboard.1"></li>
+            <li data-i18n="onboard.2"></li>
+            <li data-i18n="onboard.3"></li>
+          </ol>
+        </div>
       </div>
       <div class="transport">
         <button class="btn btn--icon" id="play" aria-label="play">${icons.play}</button>
-        <input type="range" id="scrub" min="0" max="1" step="0.02" value="0" aria-label="timeline" />
+        <div class="scrubwrap">
+          <input type="range" id="scrub" min="0" max="1" step="0.02" value="0" aria-label="timeline" />
+          <div class="ticks" id="ticks" aria-hidden="true"></div>
+        </div>
         <span class="time" id="time">0.0 / 0.0s</span>
       </div>
       <div class="row stage__actions">
@@ -67,7 +95,7 @@ function shell(): string {
       <p class="empty-note" data-i18n="export.hint"></p>
     </section>
 
-    <section class="panel panel--edit" aria-label="edit">
+    <section class="panel panel--edit" aria-label="edit" id="panel-edit">
       <h2 class="panel__title" data-i18n="nav.edit"></h2>
       <div class="field">
         <label for="template" data-i18n="template.label"></label>
@@ -77,25 +105,29 @@ function shell(): string {
           <option value="story" data-i18n="template.story"></option>
         </select>
       </div>
-      <div class="field">
-        <label for="aspect" data-i18n="aspect.label"></label>
-        <select id="aspect">
-          <option value="9:16">9:16 — Reels / Shorts / TikTok</option>
-          <option value="4:5">4:5 — feed</option>
-          <option value="1:1">1:1 — square</option>
-        </select>
+      <div class="grid-2">
+        <div class="field">
+          <label for="aspect" data-i18n="aspect.label"></label>
+          <select id="aspect">
+            <option value="9:16">9:16 · Reels</option>
+            <option value="4:5">4:5 · feed</option>
+            <option value="1:1">1:1 · square</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="target"><span data-i18n="duration.label"></span> <output id="targetVal">12s</output></label>
+          <input type="range" id="target" min="5" max="45" step="1" value="12" />
+        </div>
       </div>
-      <div class="field">
-        <label for="target"><span data-i18n="duration.label"></span> <span id="targetVal">12s</span></label>
-        <input type="range" id="target" min="5" max="45" step="1" value="12" />
-      </div>
-      <div class="field">
-        <label for="font" data-i18n="font.label"></label>
-        <select id="font">${FONTS.map((f) => `<option value="${f.id}" style="font-family:${f.family}">${f.label}</option>`).join('')}</select>
-      </div>
-      <div class="field">
-        <label for="style" data-i18n="style.label"></label>
-        <select id="style">${TEXT_STYLES.map((s) => `<option value="${s.id}">${s.label}</option>`).join('')}</select>
+      <div class="grid-2">
+        <div class="field">
+          <label for="font" data-i18n="font.label"></label>
+          <select id="font">${FONTS.map((f) => `<option value="${f.id}" style="font-family:${f.family}">${f.label}</option>`).join('')}</select>
+        </div>
+        <div class="field">
+          <label for="style" data-i18n="style.label"></label>
+          <select id="style">${TEXT_STYLES.map((s) => `<option value="${s.id}">${s.label}</option>`).join('')}</select>
+        </div>
       </div>
       <div class="field">
         <label for="hook" data-i18n="hook.label"></label>
@@ -124,12 +156,12 @@ function shell(): string {
       <span class="empty-note" data-i18n="action.rebuildWarn"></span>
     </section>
 
-    <section class="panel panel--blocks" aria-label="blocks">
+    <section class="panel panel--blocks" aria-label="blocks" id="panel-blocks">
       <h2 class="panel__title" data-i18n="nav.blocks"></h2>
       <div id="blocks"></div>
     </section>
 
-    <section class="panel panel--score" aria-label="score">
+    <section class="panel panel--score" aria-label="score" id="panel-score">
       <h2 class="panel__title" data-i18n="score.title"></h2>
       <div id="scoreBody"></div>
       <button class="btn btn--primary" id="analyze">${icons.spark}<span data-i18n="action.analyze"></span></button>
@@ -137,15 +169,34 @@ function shell(): string {
         <strong data-i18n="score.sources"></strong>
         ${SOURCES.map((s) => `<a href="${s.url}" target="_blank" rel="noopener noreferrer">${s.label}</a>`).join('')}
       </div>
-      <p class="empty-note" data-i18n="footer.privacy"></p>
     </section>
   </main>
 
-  <nav class="tabbar" role="tablist">
-    <button role="tab" data-goto="media" aria-selected="true">${icons.image}<span data-i18n="nav.media"></span></button>
-    <button role="tab" data-goto="edit" aria-selected="false">${icons.sliders}<span data-i18n="nav.edit"></span></button>
-    <button role="tab" data-goto="blocks" aria-selected="false">${icons.layers}<span data-i18n="nav.blocks"></span></button>
-    <button role="tab" data-goto="score" aria-selected="false">${icons.target}<span data-i18n="nav.score"></span></button>
+  <footer class="footer">
+    <a class="footer__parent" href="${PARENT_SITE}" target="_blank" rel="noopener noreferrer">
+      ${brandMark}
+      <span>
+        <strong>MAI Softwares</strong>
+        <small data-i18n="footer.matriz"></small>
+      </span>
+      ${icons.external}
+    </a>
+    <p class="footer__note" data-i18n="footer.privacy"></p>
+    <nav class="footer__links">
+      <a href="${PARENT_SITE}" target="_blank" rel="noopener noreferrer" data-i18n="footer.site"></a>
+      <a href="${REPO}" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <span data-i18n="footer.license"></span>
+    </nav>
+  </footer>
+
+  <nav class="tabbar" role="tablist" aria-label="secciones">
+    ${TABS.map(
+      (id) => `<button role="tab" data-goto="${id}" aria-controls="panel-${id}" aria-selected="${id === 'media'}">
+        ${icons[id === 'media' ? 'image' : id === 'edit' ? 'sliders' : id === 'blocks' ? 'layers' : 'target']}
+        <span data-i18n="nav.${id}"></span>
+        <em class="tabbar__badge" data-badge="${id}" hidden></em>
+      </button>`,
+    ).join('')}
   </nav>`;
 }
 
@@ -157,12 +208,14 @@ const viewport = $('viewport');
 const viewportEmpty = $('viewportEmpty');
 const strip = $('strip');
 const blocksBox = $('blocks');
+const ticks = $('ticks');
 const scrub = $<HTMLInputElement>('scrub');
 const timeLabel = $('time');
 const playBtn = $('play');
 const exportBtn = $<HTMLButtonElement>('export');
 const analyzeBtn = $<HTMLButtonElement>('analyze');
 const scoreBody = $('scoreBody');
+const scoreChip = $<HTMLButtonElement>('scoreChip');
 const hookInput = $<HTMLInputElement>('hook');
 const ctaInput = $<HTMLInputElement>('cta');
 const scriptInput = $<HTMLTextAreaElement>('script');
@@ -171,8 +224,11 @@ const aspectSel = $<HTMLSelectElement>('aspect');
 const fontSel = $<HTMLSelectElement>('font');
 const styleSel = $<HTMLSelectElement>('style');
 const targetRange = $<HTMLInputElement>('target');
+const importProgress = $('importProgress');
+const importBar = $('importBar');
+const importLabel = $('importLabel');
 
-const renderer = new ReelRenderer(state.project.aspect);
+const renderer = new ReelRenderer(state.project.aspect, previewScale());
 viewport.appendChild(renderer.canvas);
 
 const player = new Player(renderer, {
@@ -189,6 +245,8 @@ const player = new Player(renderer, {
 let score: ScoreResult | null = null;
 let analyzing = false;
 let scoreStale = true;
+let exporting = false;
+let analyzeTimer = 0;
 
 /* ---------- i18n ---------- */
 
@@ -207,16 +265,28 @@ function applyI18n(): void {
 
 /* ---------- media ---------- */
 
+function showImportProgress(done: number, total: number): void {
+  if (done >= total) {
+    importProgress.hidden = true;
+    return;
+  }
+  importProgress.hidden = false;
+  importBar.style.width = `${Math.round((done / total) * 100)}%`;
+  importLabel.textContent = `${t('media.processing')} ${done}/${total}`;
+}
+
 async function addFiles(files: File[]): Promise<void> {
-  const added = await loadFiles(files);
+  if (!files.length) return;
+  showImportProgress(0, files.length);
+  const added = await loadFiles(files, (done) => showImportProgress(done, files.length));
+  showImportProgress(files.length, files.length);
   if (!added.length) return;
+
   const hadClips = state.project.clips.length > 0;
   state.assets.push(...added);
   if (hadClips) {
     appendAssets(state.project, added);
-    scoreStale = true;
-    player.seek(state.time);
-    updateTransport();
+    touch();
   } else {
     rebuild();
   }
@@ -236,12 +306,13 @@ function renderStrip(): void {
       (a) => `<div class="thumb">
         <img data-id="${a.id}" src="${a.thumb ?? ''}" alt="${a.name}" />
         <span class="thumb__badge">${a.kind === 'video' ? `${a.srcDuration.toFixed(1)}s` : 'IMG'}</span>
-        <button class="thumb__del" data-del="${a.id}" aria-label="${t('clip.delete')}">${icons.close}</button>
+        <button class="thumb__del" data-del="${a.id}" aria-label="${t('clip.delete')} ${a.name}">${icons.close}</button>
       </div>`,
     )
     .join('');
   $('mediaCount').textContent = `${state.assets.length} ${t('media.count')}`;
-  viewportEmpty.style.display = state.assets.length ? 'none' : 'grid';
+  viewportEmpty.hidden = state.assets.length > 0;
+  updateBadges();
 }
 
 /* ---------- build ---------- */
@@ -260,9 +331,8 @@ function rebuild(): void {
   });
   relayout(state.project);
   applyAspect(aspect);
-  scoreStale = true;
   player.seek(0);
-  updateTransport();
+  touch();
   renderScore();
   renderBlocks();
 }
@@ -273,21 +343,66 @@ function applyAspect(aspect: Aspect): void {
   viewport.style.aspectRatio = `${w} / ${h}`;
 }
 
+/** Marks the score as outdated, refreshes the timeline UI and schedules a re-analysis. */
 function touch(): void {
   relayout(state.project);
   scoreStale = true;
   player.seek(Math.min(state.time, totalDuration(state.project)));
   updateTransport();
+  renderTicks();
+  updateBadges();
+  scheduleAnalyze();
+}
+
+function scheduleAnalyze(): void {
+  clearTimeout(analyzeTimer);
+  if (!state.assets.length || state.project.clips.length > AUTO_ANALYZE_MAX_CLIPS) return;
+  analyzeTimer = window.setTimeout(() => {
+    if (!player.playing && !exporting) void analyze();
+  }, AUTO_ANALYZE_MS);
+}
+
+function renderTicks(): void {
+  const dur = totalDuration(state.project);
+  if (!dur) {
+    ticks.innerHTML = '';
+    return;
+  }
+  ticks.innerHTML = state.project.clips
+    .slice(1)
+    .map((c) => `<span style="left:${((c.start / dur) * 100).toFixed(2)}%"></span>`)
+    .join('');
+}
+
+function updateBadges(): void {
+  const counts: Record<Tab, number> = {
+    media: state.assets.length,
+    edit: 0,
+    blocks: state.project.clips.length + state.project.texts.length,
+    score: score ? score.total : 0,
+  };
+  for (const tab of TABS) {
+    const badge = document.querySelector<HTMLElement>(`[data-badge="${tab}"]`);
+    if (!badge) continue;
+    badge.textContent = String(counts[tab]);
+    badge.hidden = counts[tab] === 0;
+  }
+  scoreChip.hidden = !score;
+  if (score) {
+    $('scoreChipVal').textContent = String(score.total);
+    scoreChip.dataset.stale = String(scoreStale);
+  }
 }
 
 function updateTransport(): void {
   const dur = totalDuration(state.project);
   scrub.max = String(Math.max(0.1, dur));
   scrub.value = String(state.time);
+  scrub.style.setProperty('--played', `${dur ? (state.time / dur) * 100 : 0}%`);
   timeLabel.textContent = `${state.time.toFixed(1)} / ${dur.toFixed(1)}s`;
   playBtn.innerHTML = player.playing ? icons.pause : icons.play;
   playBtn.setAttribute('aria-label', player.playing ? t('action.pause') : t('action.play'));
-  exportBtn.disabled = !state.assets.length;
+  exportBtn.disabled = !state.assets.length || exporting;
   analyzeBtn.disabled = !state.assets.length || analyzing;
 }
 
@@ -302,15 +417,18 @@ function clipCard(index: number): string {
   const asset = assetById(clip.assetId);
   const isVideo = asset?.kind === 'video';
   const maxIn = isVideo ? Math.max(0, (asset?.srcDuration ?? 0) - clip.duration) : 0;
-  return `<article class="block" data-clip="${clip.id}">
+  const active = state.time >= clip.start && state.time < clip.start + clip.duration;
+  return `<article class="block ${active ? 'block--active' : ''}" data-clip="${clip.id}">
     <div class="block__head">
-      <img class="block__thumb" data-id="${clip.assetId}" src="${asset?.thumb ?? ''}" alt="" />
-      <span class="block__index">${index + 1}</span>
+      <button class="block__seek" data-seek="${clip.start}" aria-label="${t('block.seek')}">
+        <img class="block__thumb" data-id="${clip.assetId}" src="${asset?.thumb ?? ''}" alt="" />
+        <span class="block__index">${index + 1}</span>
+      </button>
       <span class="block__time">${clip.start.toFixed(1)}s</span>
       <span class="block__spacer"></span>
       <button class="btn btn--icon btn--ghost" data-move="up" aria-label="${t('clip.up')}" ${index === 0 ? 'disabled' : ''}>${icons.up}</button>
       <button class="btn btn--icon btn--ghost" data-move="down" aria-label="${t('clip.down')}" ${index === state.project.clips.length - 1 ? 'disabled' : ''}>${icons.down}</button>
-      <button class="btn btn--icon btn--ghost" data-remove aria-label="${t('clip.delete')}">${icons.trash}</button>
+      <button class="btn btn--icon btn--ghost btn--danger" data-remove aria-label="${t('clip.delete')}">${icons.trash}</button>
     </div>
     <div class="block__grid">
       <label>${t('clip.effect')}
@@ -335,12 +453,13 @@ function clipCard(index: number): string {
 
 function textCard(o: TextOverlay): string {
   const dur = totalDuration(state.project);
-  return `<article class="block" data-text="${o.id}">
+  const active = state.time >= o.start && state.time <= o.end;
+  return `<article class="block ${active ? 'block--active' : ''}" data-text="${o.id}">
     <div class="block__head">
-      <span class="block__tag block__tag--${o.role}">${t(`role.${o.role}`)}</span>
+      <button class="block__tag block__tag--${o.role}" data-seek="${o.start}" aria-label="${t('block.seek')}">${t(`role.${o.role}`)}</button>
       <span class="block__time">${o.start.toFixed(1)}-${o.end.toFixed(1)}s</span>
       <span class="block__spacer"></span>
-      <button class="btn btn--icon btn--ghost" data-remove aria-label="${t('clip.delete')}">${icons.trash}</button>
+      <button class="btn btn--icon btn--ghost btn--danger" data-remove aria-label="${t('clip.delete')}">${icons.trash}</button>
     </div>
     <input type="text" data-field="text" value="${o.text.replace(/"/g, '&quot;')}" aria-label="${t('role.' + o.role)}" />
     <div class="block__grid">
@@ -372,9 +491,9 @@ function renderBlocks(): void {
     return;
   }
   blocksBox.innerHTML = `
-    <h3 class="panel__title">${t('blocks.clips')}</h3>
+    <h3 class="panel__title">${t('blocks.clips')} <em>${state.project.clips.length}</em></h3>
     <div class="blocks">${state.project.clips.map((_, i) => clipCard(i)).join('')}</div>
-    <h3 class="panel__title" style="margin-top:16px">${t('blocks.texts')}</h3>
+    <h3 class="panel__title" style="margin-top:16px">${t('blocks.texts')} <em>${state.project.texts.length}</em></h3>
     <div class="blocks">${state.project.texts.map(textCard).join('')}</div>
     <button class="btn" id="addText">${icons.plus}<span>${t('blocks.addText')}</span></button>`;
 }
@@ -385,7 +504,7 @@ blocksBox.addEventListener('click', (e) => {
     const dur = totalDuration(state.project);
     state.project.texts.push({
       id: uid('t'),
-      text: 'Texto',
+      text: t('blocks.newText'),
       start: Math.min(state.time, Math.max(0, dur - 1.5)),
       end: Math.min(dur, Math.max(1.5, state.time + 2.2)),
       role: 'caption',
@@ -398,6 +517,16 @@ blocksBox.addEventListener('click', (e) => {
     renderBlocks();
     return;
   }
+
+  const seek = target.closest<HTMLElement>('[data-seek]');
+  if (seek) {
+    player.pause();
+    player.seek(Number(seek.dataset.seek));
+    updateTransport();
+    renderBlocks();
+    return;
+  }
+
   const card = target.closest<HTMLElement>('[data-clip],[data-text]');
   if (!card) return;
 
@@ -470,6 +599,7 @@ function gauge(value: number): string {
 function renderScore(): void {
   if (!score) {
     scoreBody.innerHTML = `<p class="empty-note">${t('score.empty')}</p>`;
+    updateBadges();
     return;
   }
   const sourceLabel = (id: string) => SOURCES.find((s) => s.id === id);
@@ -477,7 +607,8 @@ function renderScore(): void {
     <div class="score">
       ${gauge(score.total)}
       <div class="score__text">
-        <h3>${t('score.title')}${scoreStale ? ' *' : ''}</h3>
+        <h3>${t('score.title')}</h3>
+        ${analyzing ? `<span class="pill pill--live">${t('score.updating')}</span>` : scoreStale ? `<span class="pill">${t('score.stale')}</span>` : ''}
         <p>${t('score.sub')}</p>
       </div>
     </div>
@@ -519,12 +650,14 @@ function renderScore(): void {
     </ul>`
         : ''
     }`;
+  updateBadges();
 }
 
 async function analyze(): Promise<void> {
   if (!state.assets.length || analyzing) return;
   analyzing = true;
   updateTransport();
+  renderScore();
   const wasPlaying = player.playing;
   player.pause();
   try {
@@ -559,15 +692,22 @@ async function exportVideo(): Promise<void> {
   }
   const label = exportBtn.querySelector('span')!;
   const prev = label.textContent;
+  exporting = true;
   exportBtn.disabled = true;
-  label.textContent = t('action.exporting');
+  exportBtn.dataset.progress = '0';
   const safeWas = state.showSafeZones;
   state.showSafeZones = false;
+  clearTimeout(analyzeTimer);
 
   try {
     player.pause();
     player.seek(0);
     await ensureFontsLoaded();
+    renderer.setScale(1);
+    applyAspect(state.project.aspect);
+    player.seek(0);
+
+    const dur = totalDuration(state.project);
     const { blob, mime } = await recordCanvas({
       canvas: renderer.canvas,
       fps: state.project.fps,
@@ -575,6 +715,9 @@ async function exportVideo(): Promise<void> {
       run: () =>
         new Promise<void>((resolve) => {
           const iv = setInterval(() => {
+            const pct = dur ? Math.min(100, Math.round((player.time / dur) * 100)) : 0;
+            label.textContent = `${t('action.exporting')} ${pct}%`;
+            exportBtn.style.setProperty('--progress', `${pct}%`);
             if (!player.playing) {
               clearInterval(iv);
               resolve();
@@ -588,11 +731,25 @@ async function exportVideo(): Promise<void> {
   } catch (err) {
     toast(String(err instanceof Error ? err.message : err));
   } finally {
+    renderer.setScale(previewScale());
+    applyAspect(state.project.aspect);
     state.showSafeZones = safeWas;
     label.textContent = prev;
-    exportBtn.disabled = false;
+    exportBtn.style.removeProperty('--progress');
+    exporting = false;
     player.seek(0);
+    updateTransport();
   }
+}
+
+/* ---------- tabs ---------- */
+
+function setTab(tab: Tab, pushHash = true): void {
+  document.body.dataset.tab = tab;
+  for (const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-goto]'))) {
+    btn.setAttribute('aria-selected', String(btn.dataset.goto === tab));
+  }
+  if (pushHash && location.hash !== `#${tab}`) history.replaceState(null, '', `#${tab}`);
 }
 
 /* ---------- events ---------- */
@@ -682,11 +839,25 @@ for (const sel of [fontSel, styleSel]) {
 targetRange.addEventListener('input', () => {
   $('targetVal').textContent = `${targetRange.value}s`;
 });
+targetRange.addEventListener('change', () => rebuild());
 templateSel.addEventListener('change', () => {
   targetRange.value = String(TEMPLATES[templateSel.value as TemplateId].target);
   $('targetVal').textContent = `${targetRange.value}s`;
   rebuild();
 });
+
+for (const input of [hookInput, ctaInput]) {
+  input.addEventListener('change', () => {
+    const role = input === hookInput ? 'hook' : 'cta';
+    const existing = state.project.texts.find((x) => x.role === role);
+    const value = input.value.trim();
+    if (existing && value) existing.text = value;
+    else if (existing) state.project.texts = state.project.texts.filter((x) => x !== existing);
+    else if (value) rebuild();
+    touch();
+    renderBlocks();
+  });
+}
 
 $('captions').addEventListener('click', () => {
   const script = scriptInput.value.trim();
@@ -702,12 +873,13 @@ $('captions').addEventListener('click', () => {
   toast(`${captions.length} ${t('toast.captions')}`);
 });
 
-$('rebuild').addEventListener('click', () => {
-  rebuild();
-  void analyze();
-});
+$('rebuild').addEventListener('click', () => rebuild());
 analyzeBtn.addEventListener('click', () => void analyze());
 exportBtn.addEventListener('click', () => void exportVideo());
+scoreChip.addEventListener('click', () => {
+  setTab('score');
+  $('panel-score').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 $('audioPick').addEventListener('click', () => $<HTMLInputElement>('audioFile').click());
 $<HTMLInputElement>('audioFile').addEventListener('change', (e) => {
@@ -729,12 +901,40 @@ $('lang').addEventListener('click', () => {
   applyI18n();
 });
 
-document.querySelectorAll<HTMLButtonElement>('[data-goto]').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    document.body.dataset.tab = btn.dataset.goto!;
-    document.querySelectorAll('[data-goto]').forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
+document.querySelectorAll<HTMLButtonElement>('[data-goto]').forEach((btn, i, all) => {
+  btn.addEventListener('click', () => setTab(btn.dataset.goto as Tab));
+  btn.addEventListener('keydown', (e) => {
+    const dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    const next = all[(i + dir + all.length) % all.length]!;
+    next.focus();
+    setTab(next.dataset.goto as Tab);
   });
 });
+
+window.addEventListener('hashchange', () => {
+  const tab = location.hash.slice(1) as Tab;
+  if (TABS.includes(tab)) setTab(tab, false);
+});
+
+/** Keeps the sticky stage docked right under the header, whatever height it currently has. */
+function syncHeaderHeight(): void {
+  const h = $('topbar').getBoundingClientRect().height;
+  document.body.style.setProperty('--header-h', `${Math.round(h)}px`);
+}
+new ResizeObserver(syncHeaderHeight).observe($('topbar'));
+wideScreen.addEventListener('change', () => {
+  if (exporting) return;
+  renderer.setScale(previewScale());
+  applyAspect(state.project.aspect);
+  player.seek(state.time);
+});
+window.addEventListener('resize', syncHeaderHeight);
+
+window.addEventListener('scroll', () => {
+  document.body.dataset.scrolled = String(window.scrollY > 12);
+}, { passive: true });
 
 window.addEventListener('keydown', (e) => {
   const tag = (e.target as HTMLElement)?.tagName;
@@ -745,14 +945,21 @@ window.addEventListener('keydown', (e) => {
     else player.play();
     updateTransport();
   }
+  if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+    player.pause();
+    player.seek(state.time + (e.code === 'ArrowRight' ? 0.2 : -0.2));
+    updateTransport();
+  }
 });
 
 /* ---------- boot ---------- */
 
-document.body.dataset.tab = 'media';
+const initialTab = (location.hash.slice(1) as Tab) || 'media';
+setTab(TABS.includes(initialTab) ? initialTab : 'media', false);
 fontSel.value = state.project.fontId;
 styleSel.value = state.project.styleId;
 applyI18n();
+syncHeaderHeight();
 rebuild();
 renderStrip();
 updateTransport();

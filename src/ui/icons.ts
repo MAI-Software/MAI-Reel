@@ -16,6 +16,7 @@ export const icons = {
   layers: svg('<path d="m12 3 8 4.5-8 4.5-8-4.5z"/><path d="m4 12 8 4.5 8-4.5"/><path d="m4 16.5 8 4.5 8-4.5"/>'),
   up: svg('<path d="m6 14 6-6 6 6"/>'),
   down: svg('<path d="m6 10 6 6 6-6"/>'),
+  external: svg('<path d="M14 5h5v5"/><path d="M19 5 11 13"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/>'),
   plus: svg('<path d="M12 5v14"/><path d="M5 12h14"/>'),
   spark: svg('<path d="M12 3v4"/><path d="M12 17v4"/><path d="M3 12h4"/><path d="M17 12h4"/><path d="m6 6 2.5 2.5"/><path d="m15.5 15.5 2.5 2.5"/><path d="m18 6-2.5 2.5"/><path d="M8.5 15.5 6 18"/>'),
 };

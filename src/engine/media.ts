@@ -32,8 +32,12 @@ function loadVideo(url: string): Promise<HTMLVideoElement> {
 }
 
 /** Turns picked files into decoded assets. Unsupported files are skipped. */
-export async function loadFiles(files: File[]): Promise<MediaAsset[]> {
+export async function loadFiles(
+  files: File[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<MediaAsset[]> {
   const out: MediaAsset[] = [];
+  let done = 0;
   for (const file of files) {
     const url = URL.createObjectURL(file);
     try {
@@ -67,6 +71,7 @@ export async function loadFiles(files: File[]): Promise<MediaAsset[]> {
     } catch {
       URL.revokeObjectURL(url);
     }
+    onProgress?.(++done, files.length);
   }
   return out;
 }
