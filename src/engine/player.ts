@@ -1,10 +1,11 @@
 import type { MediaAsset, Project } from '../types';
 import { ReelRenderer, totalDuration, clipIndexAt } from './render';
+import type { AudioTrack } from './audio';
 
 export interface PlayerHooks {
   getProject: () => Project;
   resolve: (id: string) => MediaAsset | undefined;
-  getAudio: () => HTMLAudioElement | null;
+  getAudio: () => AudioTrack | null;
   onTime: (t: number) => void;
   safeZones: () => boolean;
 }
@@ -27,11 +28,7 @@ export class Player {
     if (this.time >= this.duration - 0.05) this.seek(0);
     this.playing = true;
     this.last = performance.now();
-    const audio = this.hooks.getAudio();
-    if (audio) {
-      audio.currentTime = Math.min(this.time, audio.duration || this.time);
-      void audio.play().catch(() => undefined);
-    }
+    this.syncAudio(true);
     this.raf = requestAnimationFrame(this.tick);
   }
 
@@ -39,13 +36,14 @@ export class Player {
     this.playing = false;
     cancelAnimationFrame(this.raf);
     this.pauseAllVideos();
-    this.hooks.getAudio()?.pause();
+    this.hooks.getAudio()?.el.pause();
   }
 
   seek(t: number): void {
     this.time = Math.max(0, Math.min(t, this.duration));
     this.renderer.reset();
     this.syncMedia(true);
+    this.syncAudio(true);
     this.drawNow();
     this.hooks.onTime(this.time);
   }
@@ -61,6 +59,7 @@ export class Player {
     const dt = Math.min(0.25, (now - this.last) / 1000);
     this.last = now;
     this.time += dt;
+    this.syncAudio(false);
     if (this.time >= this.duration) {
       this.time = this.duration;
       this.syncMedia(false);
@@ -74,6 +73,16 @@ export class Player {
     this.hooks.onTime(this.time);
     this.raf = requestAnimationFrame(this.tick);
   };
+
+  /** Keeps the music locked to the timeline, playing from the chosen fragment offset. */
+  private syncAudio(hard: boolean): void {
+    const track = this.hooks.getAudio();
+    if (!track) return;
+    const want = Math.min(track.in + this.time, Math.max(0, (track.el.duration || track.duration) - 0.05));
+    if (hard || Math.abs(track.el.currentTime - want) > 0.25) track.el.currentTime = Math.max(0, want);
+    if (this.playing && track.el.paused) void track.el.play().catch(() => undefined);
+    if (!this.playing && !track.el.paused) track.el.pause();
+  }
 
   private pauseAllVideos(): void {
     const project = this.hooks.getProject();

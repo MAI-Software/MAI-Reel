@@ -15,7 +15,11 @@ Todo el procesamiento ocurre en el navegador: ningún archivo se sube a ningún 
 - **Edición por bloques**: cada plano se retoca por separado (efecto, transición de entrada, duración, punto de inicio del vídeo, reordenar, eliminar) y cada texto también (contenido, fuente, estilo, posición, tamaño, entrada y salida).
 - **Material acumulable**: puedes añadir más fotos o vídeos en cualquier momento y se anexan al final sin perder las ediciones manuales. `Regenerar montaje` sí rehace todo desde cero.
 - **Formatos**: 9:16 (1080×1920), 4:5 y 1:1.
-- **Audio**: pista propia opcional (se mezcla en la exportación).
+- **Audio con sincronía**: importas una pista, la app la decodifica, dibuja la onda, detecta BPM y rejilla de golpes (flujo de energía + histograma de intervalos), y eliges el fragmento exacto con un deslizador. Con `Ajustar los cortes a la música` cada corte cae sobre un golpe.
+- **Duración**: mínimo 8 s, atajos de 8/12/15/20 s y control manual hasta 60 s. La duración del reel es también la longitud del fragmento de audio.
+- **Efectos de plano**: zoom in/out, paneos en las cuatro direcciones, punch (golpe de zoom en el corte), vibración, giro suave, desenfoque de entrada y deriva diagonal.
+- **Transiciones**: corte, fundido, zoom, deslizar, latigazo con desenfoque de movimiento, flash, empuje vertical y barrido circular.
+- **Animación de textos**: fundido, pop, subida, rebote, máquina de escribir y karaoke (las palabras ya dichas se colorean).
 - **Exportación**: grabación del canvas en tiempo real (`MediaRecorder`), MP4 si el navegador lo soporta, si no WebM.
 - **Bilingüe** ES / EN.
 
@@ -74,6 +78,7 @@ Conectar el repositorio y usar:
 
 - La exportación graba en tiempo real: un reel de 15 s tarda 15 s en generarse.
 - Un vídeo importado se usa como un único plano continuo (sin cortes internos automáticos).
+- La detección de ritmo funciona con música de pulso marcado; con audio hablado o ambiental puede no encontrar rejilla.
 - El análisis de imagen no detecta caras ni objetos; mide luz, contraste, nitidez, color y movimiento.
 
 ## Créditos

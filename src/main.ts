@@ -10,15 +10,32 @@ import { recordCanvas, downloadBlob, extensionFor, pickMime } from './engine/exp
 import { analyzeMedia } from './analysis/frames';
 import { scoreProject, type ScoreResult } from './analysis/score';
 import { FONTS, TEXT_STYLES, ensureFontsLoaded } from './data/typography';
-import type { Aspect, Effect, TemplateId, TextOverlay, Transition } from './types';
+import { loadAudioFile, beatsInFragment, drawWaveform } from './engine/audio';
+import type { Aspect, Effect, TemplateId, TextAnim, TextOverlay, Transition } from './types';
 
 const PARENT_SITE = 'https://mai-softwares.com';
 const REPO = 'https://github.com/MAI-Software/MAI-Reel';
 const TABS = ['media', 'edit', 'blocks', 'score'] as const;
 type Tab = (typeof TABS)[number];
 
-const EFFECTS: Effect[] = ['none', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'];
-const TRANSITIONS: Transition[] = ['cut', 'fade', 'zoom', 'slide'];
+const EFFECTS: Effect[] = [
+  'none',
+  'zoom-in',
+  'zoom-out',
+  'pan-left',
+  'pan-right',
+  'pan-up',
+  'pan-down',
+  'punch',
+  'shake',
+  'rotate',
+  'blur-in',
+  'drift',
+];
+const TRANSITIONS: Transition[] = ['cut', 'fade', 'zoom', 'slide', 'whip', 'flash', 'push-up', 'wipe'];
+const ANIMS: TextAnim[] = ['fade', 'pop', 'slide-up', 'bounce', 'typewriter', 'karaoke', 'none'];
+const LENGTH_PRESETS = [8, 12, 15, 20];
+const MIN_DURATION = 8;
 const POSITIONS: Array<{ id: string; y: number }> = [
   { id: 'top', y: 0.24 },
   { id: 'mid', y: 0.5 },
@@ -116,7 +133,11 @@ function shell(): string {
         </div>
         <div class="field">
           <label for="target"><span data-i18n="duration.label"></span> <output id="targetVal">12s</output></label>
-          <input type="range" id="target" min="5" max="45" step="1" value="12" />
+          <input type="range" id="target" min="${MIN_DURATION}" max="60" step="1" value="12" />
+          <div class="chips" id="lenChips" role="group">
+            ${LENGTH_PRESETS.map((n) => `<button type="button" data-len="${n}">${n}s</button>`).join('')}
+            <button type="button" data-len="manual" data-i18n="duration.manual"></button>
+          </div>
         </div>
       </div>
       <div class="grid-2">
@@ -151,6 +172,15 @@ function shell(): string {
         </div>
         <span class="empty-note" id="audioName" data-i18n="audio.none"></span>
         <input type="file" id="audioFile" accept="audio/*" hidden />
+        <div class="audio" id="audioBox" hidden>
+          <canvas class="wave" id="wave" aria-label="waveform"></canvas>
+          <span class="empty-note" id="audioMeta"></span>
+          <label class="block__range"><span data-i18n="audio.fragment"></span> <output id="audioInVal">0.0s</output>
+            <input type="range" id="audioIn" min="0" max="10" step="0.1" value="0" />
+          </label>
+          <label class="toggle"><input type="checkbox" id="snapBeats" /><span data-i18n="audio.sync"></span></label>
+          <button class="btn btn--sm" id="audioPreview">${icons.play}<span data-i18n="audio.preview"></span></button>
+        </div>
       </div>
       <button class="btn btn--primary" id="rebuild">${icons.wand}<span data-i18n="action.rebuild"></span></button>
       <span class="empty-note" data-i18n="action.rebuildWarn"></span>
@@ -227,6 +257,10 @@ const targetRange = $<HTMLInputElement>('target');
 const importProgress = $('importProgress');
 const importBar = $('importBar');
 const importLabel = $('importLabel');
+const audioBox = $('audioBox');
+const wave = $<HTMLCanvasElement>('wave');
+const audioInRange = $<HTMLInputElement>('audioIn');
+const snapBeats = $<HTMLInputElement>('snapBeats');
 
 const renderer = new ReelRenderer(state.project.aspect, previewScale());
 viewport.appendChild(renderer.canvas);
@@ -234,7 +268,7 @@ viewport.appendChild(renderer.canvas);
 const player = new Player(renderer, {
   getProject: () => state.project,
   resolve: assetById,
-  getAudio: () => state.audio?.el ?? null,
+  getAudio: () => state.audio,
   onTime: (time) => {
     state.time = time;
     updateTransport();
@@ -247,6 +281,7 @@ let analyzing = false;
 let scoreStale = true;
 let exporting = false;
 let analyzeTimer = 0;
+let lastPlaying: boolean | null = null;
 
 /* ---------- i18n ---------- */
 
@@ -317,9 +352,16 @@ function renderStrip(): void {
 
 /* ---------- build ---------- */
 
+function currentBeats(): number[] | undefined {
+  if (!snapBeats.checked || !state.audio) return undefined;
+  const beats = beatsInFragment(state.audio, Number(targetRange.value));
+  return beats.length > 3 ? beats : undefined;
+}
+
 function rebuild(): void {
   const aspect = aspectSel.value as Aspect;
   state.project = buildProject(state.assets, {
+    beats: currentBeats(),
     template: templateSel.value as TemplateId,
     aspect,
     hook: hookInput.value.trim() || undefined,
@@ -394,16 +436,44 @@ function updateBadges(): void {
   }
 }
 
+let lastWaveTime = -1;
+
+function renderAudio(): void {
+  const track = state.audio;
+  audioBox.hidden = !track;
+  snapBeats.disabled = !track || track.beats.length < 4;
+  if (!track) return;
+  const len = Number(targetRange.value);
+  audioInRange.max = Math.max(0, track.duration - len).toFixed(1);
+  if (Number(audioInRange.value) > Number(audioInRange.max)) audioInRange.value = audioInRange.max;
+  track.in = Number(audioInRange.value);
+  $('audioInVal').textContent = `${track.in.toFixed(1)}s`;
+  $('audioMeta').textContent = track.bpm
+    ? `${track.name} · ${track.duration.toFixed(1)}s · ${track.bpm} BPM · ${track.beats.length} ${t('audio.beats')}`
+    : `${track.name} · ${track.duration.toFixed(1)}s · ${t('audio.nobeats')}`;
+  drawWaveform(wave, track, len, state.time);
+  lastWaveTime = state.time;
+}
+
 function updateTransport(): void {
   const dur = totalDuration(state.project);
   scrub.max = String(Math.max(0.1, dur));
   scrub.value = String(state.time);
   scrub.style.setProperty('--played', `${dur ? (state.time / dur) * 100 : 0}%`);
   timeLabel.textContent = `${state.time.toFixed(1)} / ${dur.toFixed(1)}s`;
-  playBtn.innerHTML = player.playing ? icons.pause : icons.play;
-  playBtn.setAttribute('aria-label', player.playing ? t('action.pause') : t('action.play'));
+  // Only touch the icon when the state flips: rewriting it every frame detaches the node
+  // under the pointer between pointerdown and pointerup, which swallows the click.
+  if (lastPlaying !== player.playing) {
+    lastPlaying = player.playing;
+    playBtn.innerHTML = player.playing ? icons.pause : icons.play;
+    playBtn.setAttribute('aria-label', player.playing ? t('action.pause') : t('action.play'));
+  }
   exportBtn.disabled = !state.assets.length || exporting;
   analyzeBtn.disabled = !state.assets.length || analyzing;
+  if (state.audio && Math.abs(state.time - lastWaveTime) > 0.08) {
+    lastWaveTime = state.time;
+    drawWaveform(wave, state.audio, Number(targetRange.value), state.time);
+  }
 }
 
 /* ---------- blocks ---------- */
@@ -469,6 +539,9 @@ function textCard(o: TextOverlay): string {
       <label>${t('style.label')}
         <select data-field="styleId">${TEXT_STYLES.map((s) => `<option value="${s.id}" ${s.id === o.styleId ? 'selected' : ''}>${s.label}</option>`).join('')}</select>
       </label>
+      <label>${t('text.anim')}
+        <select data-field="anim">${ANIMS.map((a) => `<option value="${a}" ${a === (o.anim ?? 'fade') ? 'selected' : ''}>${t(`anim.${a}`)}</option>`).join('')}</select>
+      </label>
       <label>${t('text.pos')}
         <select data-field="pos">${POSITIONS.map((p) => `<option value="${p.id}" ${p.id === posOf(o.y) ? 'selected' : ''}>${t(`pos.${p.id}`)}</option>`).join('')}</select>
       </label>
@@ -512,6 +585,7 @@ blocksBox.addEventListener('click', (e) => {
       size: 56,
       fontId: fontSel.value,
       styleId: styleSel.value,
+      anim: 'pop',
     });
     touch();
     renderBlocks();
@@ -573,6 +647,7 @@ blocksBox.addEventListener('input', (e) => {
     if (field === 'size') o.size = Number(input.value);
     if (field === 'start') o.start = Number(input.value);
     if (field === 'end') o.end = Math.max(Number(input.value), o.start + 0.3);
+    if (field === 'anim') o.anim = input.value as TextAnim;
     if (field === 'pos') o.y = POSITIONS.find((p) => p.id === input.value)?.y ?? o.y;
   }
   touch();
@@ -838,6 +913,8 @@ for (const sel of [fontSel, styleSel]) {
 
 targetRange.addEventListener('input', () => {
   $('targetVal').textContent = `${targetRange.value}s`;
+  markPreset();
+  if (state.audio) renderAudio();
 });
 targetRange.addEventListener('change', () => rebuild());
 templateSel.addEventListener('change', () => {
@@ -882,19 +959,68 @@ scoreChip.addEventListener('click', () => {
 });
 
 $('audioPick').addEventListener('click', () => $<HTMLInputElement>('audioFile').click());
-$<HTMLInputElement>('audioFile').addEventListener('change', (e) => {
+$<HTMLInputElement>('audioFile').addEventListener('change', async (e) => {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
-  const el = new Audio(URL.createObjectURL(file));
-  el.preload = 'auto';
-  state.audio = { el, name: file.name };
+  $('audioName').textContent = `${t('media.processing')}…`;
+  const track = await loadAudioFile(file);
+  state.audio?.el.pause();
+  state.audio = track;
   $('audioName').textContent = file.name;
+  audioInRange.value = '0';
+  renderAudio();
+  if (track.bpm) toast(`${track.bpm} BPM · ${track.beats.length} ${t('audio.beats')}`);
 });
 $('audioClear').addEventListener('click', () => {
   state.audio?.el.pause();
   state.audio = null;
+  snapBeats.checked = false;
   $('audioName').textContent = t('audio.none');
+  renderAudio();
 });
+audioInRange.addEventListener('input', () => {
+  if (!state.audio) return;
+  state.audio.in = Number(audioInRange.value);
+  $('audioInVal').textContent = `${state.audio.in.toFixed(1)}s`;
+  drawWaveform(wave, state.audio, Number(targetRange.value), state.time);
+});
+audioInRange.addEventListener('change', () => {
+  player.seek(state.time);
+  if (snapBeats.checked) rebuild();
+});
+snapBeats.addEventListener('change', () => {
+  if (snapBeats.checked && !currentBeats()) {
+    snapBeats.checked = false;
+    toast(t('audio.nobeats'));
+    return;
+  }
+  rebuild();
+});
+$('audioPreview').addEventListener('click', () => {
+  player.seek(0);
+  player.play();
+  updateTransport();
+});
+
+$('lenChips').addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-len]');
+  if (!btn) return;
+  if (btn.dataset.len === 'manual') {
+    targetRange.focus();
+    return;
+  }
+  targetRange.value = btn.dataset.len!;
+  $('targetVal').textContent = `${targetRange.value}s`;
+  markPreset();
+  renderAudio();
+  rebuild();
+});
+
+function markPreset(): void {
+  for (const btn of Array.from(document.querySelectorAll<HTMLElement>('[data-len]'))) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.len === targetRange.value));
+  }
+}
 
 $('lang').addEventListener('click', () => {
   state.lang = state.lang === 'es' ? 'en' : 'es';
@@ -960,6 +1086,8 @@ fontSel.value = state.project.fontId;
 styleSel.value = state.project.styleId;
 applyI18n();
 syncHeaderHeight();
+markPreset();
+renderAudio();
 rebuild();
 renderStrip();
 updateTransport();

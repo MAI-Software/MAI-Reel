@@ -6,6 +6,29 @@ const MIME_CANDIDATES = [
   'video/webm',
 ];
 
+interface AudioTap {
+  stream: MediaStream;
+}
+
+/**
+ * createMediaElementSource can only run once per element, and closing its AudioContext
+ * mutes the element for good — so the graph is built once and reused on later exports.
+ */
+const taps = new WeakMap<HTMLAudioElement, AudioTap>();
+
+function audioTap(el: HTMLAudioElement): AudioTap {
+  const cached = taps.get(el);
+  if (cached) return cached;
+  const ctx = new AudioContext();
+  const src = ctx.createMediaElementSource(el);
+  const dest = ctx.createMediaStreamDestination();
+  src.connect(dest);
+  src.connect(ctx.destination);
+  const tap: AudioTap = { stream: dest.stream };
+  taps.set(el, tap);
+  return tap;
+}
+
 export function pickMime(): string {
   for (const m of MIME_CANDIDATES) {
     if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) return m;
@@ -32,18 +55,13 @@ export async function recordCanvas(opts: RecordOptions): Promise<{ blob: Blob; m
   if (!mime) throw new Error('MediaRecorder not supported');
 
   const stream = opts.canvas.captureStream(opts.fps);
-  let ctxAudio: AudioContext | null = null;
 
   if (opts.audio) {
     try {
-      ctxAudio = new AudioContext();
-      const src = ctxAudio.createMediaElementSource(opts.audio);
-      const dest = ctxAudio.createMediaStreamDestination();
-      src.connect(dest);
-      src.connect(ctxAudio.destination);
-      for (const track of dest.stream.getAudioTracks()) stream.addTrack(track);
+      const tap = audioTap(opts.audio);
+      for (const track of tap.stream.getAudioTracks()) stream.addTrack(track);
     } catch {
-      ctxAudio = null;
+      /* element already routed elsewhere: export video only */
     }
   }
 
@@ -66,8 +84,7 @@ export async function recordCanvas(opts: RecordOptions): Promise<{ blob: Blob; m
     await new Promise((r) => setTimeout(r, 220));
     if (rec.state !== 'inactive') rec.stop();
     await stopped;
-    for (const t of stream.getTracks()) t.stop();
-    void ctxAudio?.close();
+    for (const t of stream.getVideoTracks()) t.stop();
   }
 
   return { blob: new Blob(chunks, { type: mime }), mime };

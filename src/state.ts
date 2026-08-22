@@ -1,10 +1,11 @@
 import type { MediaAsset, Project } from './types';
 import { DEFAULT_FONT, DEFAULT_STYLE } from './data/typography';
+import type { AudioTrack } from './engine/audio';
 
 export interface AppState {
   assets: MediaAsset[];
   project: Project;
-  audio: { el: HTMLAudioElement; name: string } | null;
+  audio: AudioTrack | null;
   time: number;
   playing: boolean;
   lang: 'es' | 'en';

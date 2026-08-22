@@ -294,6 +294,7 @@ button {
   width: 20px;
   height: 20px;
   flex: 0 0 auto;
+  pointer-events: none;
 }
 
 .toggle {
@@ -1014,6 +1015,54 @@ body[data-scrolled='true'] .topbar {
   .stage__actions {
     max-width: min(360px, 88vw);
   }
+}
+
+/* ---------- audio ---------- */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chips button {
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--fg-dim);
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 160ms ease-out, color 160ms ease-out, border-color 160ms ease-out;
+}
+
+.chips button[aria-pressed='true'] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.audio {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.wave {
+  width: 100%;
+  height: 64px;
+  display: block;
+  border-radius: 8px;
+  background: rgba(4, 7, 18, 0.5);
+}
+
+.audio .toggle {
+  min-height: 44px;
 }
 
 /* ---------- mobile tabs ---------- */

@@ -9,7 +9,7 @@ export const SIZES: Record<Aspect, [number, number]> = {
 
 /** Safe zones: fraction of the frame reserved by the platform UI (Meta / TikTok overlays). */
 export const SAFE = { top: 0.14, bottom: 0.2, side: 0.06 };
-export const TRANSITION_DUR = 0.28;
+export const TRANSITION_DUR = 0.32;
 
 export type Resolve = (id: string) => MediaAsset | undefined;
 
@@ -26,19 +26,59 @@ export function clipIndexAt(p: Project, t: number): number {
   return p.clips.length ? p.clips.length - 1 : -1;
 }
 
-function effectParams(effect: Effect, p: number): { zoom: number; panX: number; panY: number } {
-  const e = p * p * (3 - 2 * p); // smoothstep
+const smooth = (p: number) => p * p * (3 - 2 * p);
+const easeOut = (p: number) => 1 - (1 - p) ** 3;
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+interface Motion {
+  zoom: number;
+  panX: number;
+  panY: number;
+  rot: number;
+  blur: number;
+}
+
+function effectMotion(effect: Effect, p: number, seconds: number): Motion {
+  const e = smooth(p);
+  const base: Motion = { zoom: 1, panX: 0, panY: 0, rot: 0, blur: 0 };
   switch (effect) {
     case 'zoom-in':
-      return { zoom: 1 + 0.14 * e, panX: 0, panY: 0 };
+      return { ...base, zoom: 1 + 0.14 * e };
     case 'zoom-out':
-      return { zoom: 1.14 - 0.14 * e, panX: 0, panY: 0 };
+      return { ...base, zoom: 1.14 - 0.14 * e };
     case 'pan-left':
-      return { zoom: 1.12, panX: 0.8 - 1.6 * e, panY: 0 };
+      return { ...base, zoom: 1.12, panX: 0.8 - 1.6 * e };
     case 'pan-right':
-      return { zoom: 1.12, panX: -0.8 + 1.6 * e, panY: 0 };
+      return { ...base, zoom: 1.12, panX: -0.8 + 1.6 * e };
+    case 'pan-up':
+      return { ...base, zoom: 1.14, panY: 0.8 - 1.6 * e };
+    case 'pan-down':
+      return { ...base, zoom: 1.14, panY: -0.8 + 1.6 * e };
+    case 'punch': {
+      // hard zoom on the cut, settling fast, then a slow creep
+      const hit = clamp01(p / 0.22);
+      return { ...base, zoom: 1.22 - 0.22 * easeOut(hit) + 0.05 * p };
+    }
+    case 'shake': {
+      const amp = 0.035 * (1 - 0.5 * p);
+      return {
+        ...base,
+        zoom: 1.1,
+        panX: Math.sin(seconds * 17) * amp,
+        panY: Math.cos(seconds * 13.5) * amp,
+        rot: Math.sin(seconds * 9) * 0.004,
+      };
+    }
+    case 'rotate':
+      return { ...base, zoom: 1.16, rot: (-0.035 + 0.07 * e) };
+    case 'blur-in': {
+      const k = clamp01(p / 0.35);
+      return { ...base, zoom: 1.1 - 0.06 * easeOut(k), blur: 18 * (1 - easeOut(k)) };
+    }
+    case 'drift':
+      return { ...base, zoom: 1.15, panX: -0.5 + e, panY: 0.5 - e };
     default:
-      return { zoom: 1, panX: 0, panY: 0 };
+      return base;
   }
 }
 
@@ -110,21 +150,28 @@ export class ReelRenderer {
     this.lastIndex = -1;
   }
 
-  private drawMedia(asset: MediaAsset, effect: Effect, p: number, alpha: number): void {
+  private drawMedia(asset: MediaAsset, effect: Effect, p: number, seconds: number, alpha: number): void {
     const { ctx } = this;
     const dw = this.canvas.width;
     const dh = this.canvas.height;
     const sw = asset.width;
     const sh = asset.height;
     if (!sw || !sh) return;
-    const { zoom, panX, panY } = effectParams(effect, p);
-    const scale = Math.max(dw / sw, dh / sh) * zoom;
+    const m = effectMotion(effect, p, seconds);
+    const scale = Math.max(dw / sw, dh / sh) * m.zoom;
     const w = sw * scale;
     const h = sh * scale;
-    const x = (dw - w) / 2 + panX * ((w - dw) / 2);
-    const y = (dh - h) / 2 + panY * ((h - dh) / 2);
+    const x = (dw - w) / 2 + m.panX * ((w - dw) / 2);
+    const y = (dh - h) / 2 + m.panY * ((h - dh) / 2);
+
     ctx.save();
     ctx.globalAlpha = alpha;
+    if (m.blur > 0.2) ctx.filter = `blur(${(m.blur * this.unit).toFixed(1)}px)`;
+    if (m.rot) {
+      ctx.translate(dw / 2, dh / 2);
+      ctx.rotate(m.rot);
+      ctx.translate(-dw / 2, -dh / 2);
+    }
     try {
       ctx.drawImage(asset.el as CanvasImageSource, x, y, w, h);
     } catch {
@@ -133,6 +180,7 @@ export class ReelRenderer {
     ctx.restore();
   }
 
+  /** Draws one text overlay with its entrance animation. */
   private drawText(o: TextOverlay, t: number): void {
     const { ctx } = this;
     const dw = this.canvas.width;
@@ -145,21 +193,56 @@ export class ReelRenderer {
     if (style.tracking && 'letterSpacing' in ctx) {
       (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${size * style.tracking}px`;
     }
+
+    const life = Math.max(0.001, o.end - o.start);
+    const local = t - o.start;
+    const anim = o.anim ?? 'fade';
+    const inP = clamp01(local / (anim === 'typewriter' ? Math.min(0.9, life * 0.5) : 0.26));
+    const outP = clamp01((o.end - t) / 0.22);
+
     const maxW = dw * (1 - SAFE.side * 2) - 40 * this.unit;
-    const text = style.uppercase ? o.text.toUpperCase() : o.text;
-    const lines = wrapText(ctx, text, maxW);
+    const full = style.uppercase ? o.text.toUpperCase() : o.text;
+    const shown = anim === 'typewriter' ? full.slice(0, Math.max(1, Math.round(full.length * inP))) : full;
+    const lines = wrapText(ctx, shown, maxW);
     const lh = size * 1.22;
     const blockH = lines.length * lh;
-    const appear = Math.min(1, Math.max(0, (t - o.start) / 0.22));
-    const ease = appear * appear * (3 - 2 * appear);
-    let top = o.y * dh - blockH / 2;
     const margin = 20 * this.unit;
+    let top = o.y * dh - blockH / 2;
     top = Math.max(dh * SAFE.top + margin, Math.min(top, dh * (1 - SAFE.bottom) - blockH - margin));
 
+    let alpha = Math.min(smooth(inP), smooth(outP));
+    let scale = 1;
+    let offsetY = 0;
+    switch (anim) {
+      case 'none':
+        alpha = 1;
+        break;
+      case 'pop':
+        scale = 0.72 + 0.28 * easeOut(inP) + 0.06 * Math.sin(Math.PI * inP);
+        break;
+      case 'slide-up':
+        offsetY = (1 - easeOut(inP)) * 60 * this.unit;
+        break;
+      case 'bounce': {
+        const b = easeOut(inP);
+        offsetY = (1 - b) * -40 * this.unit;
+        scale = 1 + 0.12 * Math.sin(Math.PI * inP);
+        break;
+      }
+      case 'typewriter':
+        alpha = smooth(outP);
+        break;
+      default:
+        break;
+    }
+
     ctx.save();
-    ctx.globalAlpha = ease;
-    ctx.translate(0, (1 - ease) * 18 * this.unit);
-    if (style.bg) {
+    ctx.globalAlpha = alpha;
+    ctx.translate(dw / 2, top + blockH / 2 + offsetY);
+    ctx.scale(scale, scale);
+    ctx.translate(-dw / 2, -(top + blockH / 2));
+
+    if (style.bg && lines.length) {
       const padX = size * 0.5;
       const padY = size * 0.34;
       const wBox = Math.max(...lines.map((l) => ctx.measureText(l).width)) + padX * 2;
@@ -167,8 +250,13 @@ export class ReelRenderer {
       roundRect(ctx, (dw - wBox) / 2, top - padY, wBox, blockH + padY * 2, size * 0.28);
       ctx.fill();
     }
+
     lines.forEach((line, i) => {
       const y = top + lh * i + lh / 2;
+      if (anim === 'karaoke') {
+        this.drawKaraokeLine(line, full, y, size, style, clamp01(local / life));
+        return;
+      }
       if (style.stroke) {
         ctx.lineWidth = size * (style.strokeWidth ?? 0.14);
         ctx.strokeStyle = style.stroke;
@@ -183,10 +271,47 @@ export class ReelRenderer {
       ctx.fillText(line, dw / 2, y);
       ctx.shadowBlur = 0;
     });
+
     if ('letterSpacing' in ctx) {
       (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0px';
     }
     ctx.restore();
+  }
+
+  /** Karaoke: words already "spoken" are filled with the accent colour, the rest stay dim. */
+  private drawKaraokeLine(
+    line: string,
+    full: string,
+    y: number,
+    size: number,
+    style: ReturnType<typeof styleById>,
+    progress: number,
+  ): void {
+    const { ctx } = this;
+    const dw = this.canvas.width;
+    const words = line.split(' ');
+    const totalWords = full.split(/\s+/).filter(Boolean).length || words.length;
+    const spokenWords = progress * totalWords;
+    const lineWidth = ctx.measureText(line).width;
+    let x = (dw - lineWidth) / 2;
+    const spaceW = ctx.measureText(' ').width;
+    const startIndex = full.indexOf(line) >= 0 ? full.slice(0, full.indexOf(line)).split(/\s+/).filter(Boolean).length : 0;
+
+    ctx.textAlign = 'left';
+    words.forEach((word, i) => {
+      const w = ctx.measureText(word).width;
+      const done = startIndex + i < spokenWords;
+      if (style.stroke) {
+        ctx.lineWidth = size * (style.strokeWidth ?? 0.14);
+        ctx.strokeStyle = style.stroke;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(word, x, y);
+      }
+      ctx.fillStyle = done ? '#EC4899' : style.fill;
+      ctx.fillText(word, x, y);
+      x += w + spaceW;
+    });
+    ctx.textAlign = 'center';
   }
 
   private drawSafeZones(): void {
@@ -209,41 +334,39 @@ export class ReelRenderer {
     const { ctx } = this;
     const dw = this.canvas.width;
     const dh = this.canvas.height;
+
+    const i = clipIndexAt(project, t);
+    // Snapshot the frame that is still on screen BEFORE clearing, so transitions blend
+    // from the previous shot instead of from black.
+    if (i !== this.lastIndex) {
+      this.snapCtx.drawImage(this.canvas, 0, 0);
+      this.lastIndex = i;
+    }
+
     ctx.fillStyle = '#04070F';
     ctx.fillRect(0, 0, dw, dh);
 
-    const i = clipIndexAt(project, t);
     if (i >= 0) {
       const clip = project.clips[i]!;
       const asset = resolve(clip.assetId);
-      if (i !== this.lastIndex) {
-        this.snapCtx.drawImage(this.canvas, 0, 0);
-        this.lastIndex = i;
-      }
       const local = Math.max(0, Math.min(clip.duration, t - clip.start));
       const p = clip.duration > 0 ? local / clip.duration : 0;
-      const tp = clip.transition !== 'cut' && i > 0 ? Math.min(1, local / TRANSITION_DUR) : 1;
+      const raw = clip.transition !== 'cut' && i > 0 ? clamp01(local / TRANSITION_DUR) : 1;
+      const tp = easeOut(raw);
 
-      if (tp < 1) {
-        ctx.drawImage(this.snap, clip.transition === 'slide' ? -dw * tp * 0.35 : 0, 0);
-      }
+      if (raw < 1) this.drawOutgoing(clip.transition, tp);
 
       if (asset) {
-        if (clip.transition === 'zoom' && tp < 1) {
-          const s = 1 + 0.18 * (1 - tp);
+        ctx.save();
+        this.applyIncoming(clip.transition, tp, raw);
+        this.drawMedia(asset, clip.effect, p, t, clip.transition === 'fade' || clip.transition === 'zoom' ? tp : 1);
+        ctx.restore();
+        if (clip.transition === 'flash' && raw < 1) {
           ctx.save();
-          ctx.translate(dw / 2, dh / 2);
-          ctx.scale(s, s);
-          ctx.translate(-dw / 2, -dh / 2);
-          this.drawMedia(asset, clip.effect, p, tp);
+          ctx.globalAlpha = (1 - raw) ** 1.6 * 0.9;
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, dw, dh);
           ctx.restore();
-        } else if (clip.transition === 'slide' && tp < 1) {
-          ctx.save();
-          ctx.translate(dw * (1 - tp), 0);
-          this.drawMedia(asset, clip.effect, p, 1);
-          ctx.restore();
-        } else {
-          this.drawMedia(asset, clip.effect, p, tp);
         }
       }
     }
@@ -252,6 +375,74 @@ export class ReelRenderer {
       if (t >= o.start && t <= o.end) this.drawText(o, t);
     }
     if (opts.safeZones) this.drawSafeZones();
+  }
+
+  /** Paints the frozen previous frame while the new clip comes in. */
+  private drawOutgoing(transition: Project['clips'][number]['transition'], tp: number): void {
+    const { ctx } = this;
+    const dw = this.canvas.width;
+    const dh = this.canvas.height;
+    ctx.save();
+    switch (transition) {
+      case 'slide':
+        ctx.drawImage(this.snap, -dw * tp * 0.35, 0);
+        break;
+      case 'whip':
+        ctx.filter = `blur(${(1 - tp) * 14 * this.unit}px)`;
+        ctx.drawImage(this.snap, -dw * tp, 0);
+        break;
+      case 'push-up':
+        ctx.drawImage(this.snap, 0, -dh * tp);
+        break;
+      case 'zoom': {
+        const s = 1 + 0.12 * tp;
+        ctx.translate(dw / 2, dh / 2);
+        ctx.scale(s, s);
+        ctx.translate(-dw / 2, -dh / 2);
+        ctx.drawImage(this.snap, 0, 0);
+        break;
+      }
+      default:
+        ctx.drawImage(this.snap, 0, 0);
+        break;
+    }
+    ctx.restore();
+  }
+
+  /** Transforms the context so the incoming clip enters with the chosen motion. */
+  private applyIncoming(transition: Project['clips'][number]['transition'], tp: number, raw: number): void {
+    const { ctx } = this;
+    const dw = this.canvas.width;
+    const dh = this.canvas.height;
+    if (raw >= 1) return;
+    switch (transition) {
+      case 'slide':
+        ctx.translate(dw * (1 - tp), 0);
+        break;
+      case 'whip':
+        ctx.translate(dw * (1 - tp), 0);
+        ctx.filter = `blur(${(1 - tp) * 12 * this.unit}px)`;
+        break;
+      case 'push-up':
+        ctx.translate(0, dh * (1 - tp));
+        break;
+      case 'zoom': {
+        const s = 1 + 0.18 * (1 - tp);
+        ctx.translate(dw / 2, dh / 2);
+        ctx.scale(s, s);
+        ctx.translate(-dw / 2, -dh / 2);
+        break;
+      }
+      case 'wipe': {
+        const r = Math.hypot(dw, dh) * 0.55 * tp;
+        ctx.beginPath();
+        ctx.arc(dw / 2, dh / 2, Math.max(1, r), 0, Math.PI * 2);
+        ctx.clip();
+        break;
+      }
+      default:
+        break;
+    }
   }
 
   reset(): void {

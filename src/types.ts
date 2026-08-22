@@ -12,8 +12,23 @@ export interface MediaAsset {
   thumb?: string;
 }
 
-export type Effect = 'none' | 'zoom-in' | 'zoom-out' | 'pan-left' | 'pan-right';
-export type Transition = 'cut' | 'fade' | 'zoom' | 'slide';
+export type Effect =
+  | 'none'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'pan-left'
+  | 'pan-right'
+  | 'pan-up'
+  | 'pan-down'
+  | 'punch'
+  | 'shake'
+  | 'rotate'
+  | 'blur-in'
+  | 'drift';
+
+export type Transition = 'cut' | 'fade' | 'zoom' | 'slide' | 'whip' | 'flash' | 'push-up' | 'wipe';
+
+export type TextAnim = 'none' | 'fade' | 'pop' | 'slide-up' | 'typewriter' | 'karaoke' | 'bounce';
 export type TemplateId = 'punch' | 'flow' | 'story';
 export type Aspect = '9:16' | '4:5' | '1:1';
 export type TextRole = 'hook' | 'caption' | 'cta';
@@ -38,6 +53,7 @@ export interface TextOverlay {
   size: number;
   fontId: string;
   styleId: string;
+  anim: TextAnim;
 }
 
 export interface Project {

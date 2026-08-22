@@ -1,4 +1,4 @@
-import type { Aspect, Clip, Effect, MediaAsset, Project, TemplateId, TextOverlay, Transition } from '../types';
+import type { Aspect, Clip, Effect, MediaAsset, Project, TemplateId, TextAnim, TextOverlay, Transition } from '../types';
 import { uid } from '../state';
 import { DEFAULT_FONT, DEFAULT_STYLE } from '../data/typography';
 
@@ -19,8 +19,8 @@ export const TEMPLATES: Record<TemplateId, TemplateSpec> = {
     maxClip: 1.4,
     maxVideoClip: 4,
     target: 12,
-    transitions: ['cut', 'cut', 'zoom'],
-    effects: ['zoom-in', 'zoom-out', 'pan-left', 'zoom-in', 'pan-right'],
+    transitions: ['cut', 'flash', 'cut', 'whip'],
+    effects: ['punch', 'zoom-in', 'shake', 'zoom-out', 'pan-left', 'punch', 'pan-right'],
   },
   flow: {
     id: 'flow',
@@ -28,8 +28,8 @@ export const TEMPLATES: Record<TemplateId, TemplateSpec> = {
     maxClip: 2.4,
     maxVideoClip: 6,
     target: 15,
-    transitions: ['fade', 'slide', 'fade'],
-    effects: ['pan-right', 'zoom-in', 'pan-left', 'zoom-out'],
+    transitions: ['fade', 'slide', 'wipe', 'fade'],
+    effects: ['pan-right', 'zoom-in', 'drift', 'pan-left', 'zoom-out', 'pan-up'],
   },
   story: {
     id: 'story',
@@ -37,8 +37,8 @@ export const TEMPLATES: Record<TemplateId, TemplateSpec> = {
     maxClip: 3.4,
     maxVideoClip: 8,
     target: 20,
-    transitions: ['fade', 'fade', 'cut'],
-    effects: ['zoom-in', 'zoom-in', 'zoom-out'],
+    transitions: ['fade', 'push-up', 'fade'],
+    effects: ['zoom-in', 'blur-in', 'drift', 'rotate', 'zoom-out'],
   },
 };
 
@@ -53,6 +53,9 @@ export interface BuildOptions {
   keepTexts?: TextOverlay[];
   fontId?: string;
   styleId?: string;
+  anim?: TextAnim;
+  /** Beat grid (seconds from the reel start) used to snap every cut to the music. */
+  beats?: number[];
   /** Optional script: split into timed caption blocks over the whole reel. */
   script?: string;
 }
@@ -69,7 +72,26 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
 
   const clips: Clip[] = [];
   let cursor = 0;
-  assets.forEach((asset, i) => {
+
+  const grid = opts.beats && opts.beats.length > 3 ? beatGrid(opts.beats, target, perImage) : null;
+  if (grid) {
+    grid.forEach((duration, i) => {
+      const asset = assets[i % assets.length]!;
+      clips.push({
+        id: uid('c'),
+        assetId: asset.id,
+        start: cursor,
+        duration: asset.kind === 'video' ? Math.min(duration, asset.srcDuration || duration) : duration,
+        srcIn: 0,
+        effect: asset.kind === 'video' ? 'none' : spec.effects[i % spec.effects.length]!,
+        transition: i === 0 ? 'cut' : spec.transitions[i % spec.transitions.length]!,
+      });
+      cursor += clips[clips.length - 1]!.duration;
+    });
+  }
+
+  if (!grid)
+    assets.forEach((asset, i) => {
     const duration =
       asset.kind === 'video'
         ? clamp(asset.srcDuration || spec.maxVideoClip, spec.minClip, assets.length === 1 ? Math.max(target, spec.maxVideoClip) : spec.maxVideoClip)
@@ -87,7 +109,7 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
   });
 
   const stills = assets.filter((a) => a.kind === 'image');
-  if (cycle && stills.length && cursor < target * 0.85) {
+  if (!grid && cycle && stills.length && cursor < target * 0.85) {
     let i = clips.length;
     while (cursor < target - 0.2 && i < 120) {
       const asset = stills[i % stills.length]!;
@@ -110,6 +132,7 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
   const total = cursor;
   const fontId = opts.fontId ?? DEFAULT_FONT;
   const styleId = opts.styleId ?? DEFAULT_STYLE;
+  const anim: TextAnim = opts.anim ?? 'pop';
   const texts: TextOverlay[] = opts.keepTexts ? [...opts.keepTexts] : [];
   if (opts.hook && !texts.some((t) => t.role === 'hook')) {
     texts.push({
@@ -122,11 +145,12 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
       size: 92,
       fontId,
       styleId,
+      anim,
     });
   }
   if (opts.script && total > 1) {
     const hookEnd = texts.find((t) => t.role === 'hook')?.end ?? 0;
-    texts.push(...buildCaptions(opts.script, hookEnd, Math.max(hookEnd, total - 2.4), fontId, styleId));
+    texts.push(...buildCaptions(opts.script, hookEnd, Math.max(hookEnd, total - 2.4), fontId, styleId, anim));
   }
   if (opts.cta && total > 3 && !texts.some((t) => t.role === 'cta')) {
     texts.push({
@@ -139,6 +163,7 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
       size: 54,
       fontId,
       styleId,
+      anim,
     });
   }
 
@@ -154,6 +179,7 @@ export function buildCaptions(
   to: number,
   fontId: string,
   styleId: string,
+  anim: TextAnim = 'slide-up',
 ): TextOverlay[] {
   const words = script.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
   if (!words.length || to - from < 0.5) return [];
@@ -190,6 +216,7 @@ export function buildCaptions(
       size: 56,
       fontId,
       styleId,
+      anim,
     });
     cursor = end;
   });
@@ -228,4 +255,28 @@ export function relayout(project: Project): Project {
     cursor += c.duration;
   }
   return project;
+}
+
+/** Turns a beat grid into shot lengths: every cut lands on a beat, each shot close to `desired`. */
+function beatGrid(beats: number[], target: number, desired: number): number[] {
+  const inRange = beats.filter((b) => b >= 0 && b <= target);
+  if (inRange.length < 4) return [];
+  const diffs: number[] = [];
+  for (let i = 1; i < inRange.length; i++) diffs.push(inRange[i]! - inRange[i - 1]!);
+  diffs.sort((a, b) => a - b);
+  const beatLen = diffs[Math.floor(diffs.length / 2)] ?? 0.5;
+  const stride = Math.max(1, Math.round(desired / beatLen));
+
+  const bounds: number[] = [];
+  for (let i = 0; i < inRange.length; i += stride) bounds.push(inRange[i]!);
+  if (bounds[0]! > 0.05) bounds.unshift(0);
+  const last = bounds[bounds.length - 1]!;
+  if (target - last > beatLen * stride * 0.5) bounds.push(target);
+
+  const out: number[] = [];
+  for (let i = 1; i < bounds.length; i++) {
+    const d = Number((bounds[i]! - bounds[i - 1]!).toFixed(3));
+    if (d >= 0.3) out.push(d);
+  }
+  return out;
 }
