@@ -1,6 +1,7 @@
 import type { Project } from '../types';
 import type { MediaStats } from './frames';
 import { SAFE, totalDuration } from '../engine/render';
+import { t } from '../i18n';
 
 export type FactorId = 'hook' | 'duration' | 'pace' | 'format' | 'text' | 'quality' | 'loop';
 
@@ -66,17 +67,17 @@ export function scoreProject(project: Project, media: MediaStats): ScoreResult {
     const early = hook.start <= 0.3;
     const short = hook.text.trim().length <= 60;
     hookScore += early && short ? 8 : early || short ? 5 : 3;
-    hookDetail.push(`hook:"${hook.text.slice(0, 32)}" @${round1(hook.start)}s`);
+    hookDetail.push(`"${hook.text.slice(0, 32)}" @${round1(hook.start)}s`);
   } else {
-    hookDetail.push('hook:none');
+    hookDetail.push(t('detail.noHook'));
   }
   const firstClip = project.clips[0];
   const openPace = firstClip ? bell(firstClip.duration, 0, 0.5, 2, 4) : 0;
   hookScore += openPace * 6;
-  hookDetail.push(`shot1:${round1(firstClip?.duration ?? 0)}s`);
+  hookDetail.push(`${t('detail.shot1')} ${round1(firstClip?.duration ?? 0)}s`);
   const openVisual = clamp01(first.contrast * 0.6 + first.sharpness * 0.4);
   hookScore += openVisual * 6;
-  hookDetail.push(`contrast1:${round1(first.contrast * 100)}%`);
+  hookDetail.push(`${t('detail.contrast')} ${round1(first.contrast * 100)}%`);
 
   // 2. Duration (15)
   const durScore = bell(duration, 2, 7, 21, 60) * 15;
@@ -118,26 +119,33 @@ export function scoreProject(project: Project, media: MediaStats): ScoreResult {
       id: 'pace',
       score: paceScore,
       max: 15,
-      detail: [`${cuts} cortes`, `${round1(avgShot)}s/plano`, `motion:${round1(media.motion * 100)}%`],
+      detail: [
+        `${cuts} ${t('detail.cuts')}`,
+        `${round1(avgShot)}s ${t('detail.perShot')}`,
+        `${t('detail.motion')} ${round1(media.motion * 100)}%`,
+      ],
     },
     { id: 'format', score: formatScore, max: 10, detail: [project.aspect] },
     {
       id: 'text',
       score: textScore,
       max: 15,
-      detail: [`${project.texts.length} textos`, `${Math.round(textCoverage * 100)}% del tiempo`],
+      detail: [
+        `${project.texts.length} ${t('detail.texts')}`,
+        `${Math.round(textCoverage * 100)}% ${t('detail.coverage')}`,
+      ],
     },
     {
       id: 'quality',
       score: qualityScore,
       max: 15,
       detail: [
-        `luz:${Math.round(g.luma * 100)}%`,
-        `contraste:${Math.round(g.contrast * 100)}%`,
-        `nitidez:${Math.round(g.sharpness * 100)}%`,
+        `${t('detail.light')} ${Math.round(g.luma * 100)}%`,
+        `${t('detail.contrast')} ${Math.round(g.contrast * 100)}%`,
+        `${t('detail.sharp')} ${Math.round(g.sharpness * 100)}%`,
       ],
     },
-    { id: 'loop', score: loopScore, max: 10, detail: [`dif. bucle:${Math.round(media.loopDiff * 100)}%`] },
+    { id: 'loop', score: loopScore, max: 10, detail: [`${t('detail.loop')} ${Math.round(media.loopDiff * 100)}%`] },
   ];
 
   const total = Math.max(1, Math.min(100, Math.round(factors.reduce((a, f) => a + f.score, 0))));

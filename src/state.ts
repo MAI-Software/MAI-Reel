@@ -1,6 +1,7 @@
 import type { MediaAsset, Project } from './types';
 import { DEFAULT_FONT, DEFAULT_STYLE } from './data/typography';
 import type { AudioTrack } from './engine/audio';
+import { initialLang, type Lang } from './i18n';
 
 export interface AppState {
   assets: MediaAsset[];
@@ -8,7 +9,7 @@ export interface AppState {
   audio: AudioTrack | null;
   time: number;
   playing: boolean;
-  lang: 'es' | 'en';
+  lang: Lang;
   showSafeZones: boolean;
   /** Currently applied quick-style pack. */
   packId: string | null;
@@ -40,7 +41,7 @@ export const state: AppState = {
   audio: null,
   time: 0,
   playing: false,
-  lang: (localStorage.getItem('mai-reel-lang') as 'es' | 'en') ?? 'es',
+  lang: initialLang(),
   showSafeZones: false,
   packId: null,
 };

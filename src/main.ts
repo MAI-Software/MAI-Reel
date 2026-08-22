@@ -1,17 +1,17 @@
 import './styles.css';
 import { state, assetById, uid } from './state';
-import { setLang, t, SOURCES } from './i18n';
+import { setLang, t, SOURCES, LANGS, LANG_NAMES, type Lang } from './i18n';
 import { icons, brandMark } from './ui/icons';
 import { loadFiles, thumbnail } from './engine/media';
 import { buildProject, relayout, appendAssets, buildCaptions, TEMPLATES } from './engine/autoedit';
 import { ReelRenderer, SIZES, totalDuration } from './engine/render';
 import { Player } from './engine/player';
 import { recordCanvas, downloadBlob, extensionFor, pickMime } from './engine/export';
-import { analyzeMedia } from './analysis/frames';
+import { analyzeMedia, type MediaStats } from './analysis/frames';
 import { scoreProject, type ScoreResult } from './analysis/score';
 import { FONTS, TEXT_STYLES, ensureFontsLoaded } from './data/typography';
 import { loadAudioFile, beatsInFragment, drawWaveform, analyzeFileAudio } from './engine/audio';
-import { STYLE_PACKS, packById, autoDirect } from './engine/director';
+import { STYLE_PACKS, packById, autoDirect, formatReason, type Reason } from './engine/director';
 import { buildEntertainProject, idleEnhance } from './engine/autoedit';
 import { detectFocus } from './analysis/focus';
 import type { Aspect, Effect, Grade, ReelMode, TemplateId, TextAnim, TextOverlay, Transition } from './types';
@@ -69,7 +69,13 @@ function shell(): string {
     <button class="chip chip--score" id="scoreChip" hidden>
       ${icons.target}<strong id="scoreChipVal">--</strong><small>/100</small>
     </button>
-    <button class="btn btn--ghost btn--sm" id="lang" aria-label="Language"><span data-i18n="lang.switch"></span></button>
+    <label class="chip chip--lang" for="lang">
+      ${icons.globe}
+      <span class="sr-only" data-i18n="lang.label"></span>
+      <select id="lang">
+        ${LANGS.map((l) => `<option value="${l}">${LANG_NAMES[l]}</option>`).join('')}
+      </select>
+    </label>
   </header>
 
   <main class="layout">
@@ -117,7 +123,7 @@ function shell(): string {
       <div class="field" id="packField">
         <label data-i18n="quick.label"></label>
         <div class="chips chips--wrap" id="packs">
-          ${STYLE_PACKS.map((p) => `<button type="button" data-pack="${p.id}">${p.label}</button>`).join('')}
+          ${STYLE_PACKS.map((p) => `<button type="button" data-pack="${p.id}" data-i18n="pack.${p.id}"></button>`).join('')}
         </div>
       </div>
       <div class="field">
@@ -320,20 +326,26 @@ let scoreStale = true;
 let exporting = false;
 let analyzeTimer = 0;
 let lastPlaying: boolean | null = null;
+let lastStats: MediaStats | null = null;
+let lastReasons: Reason[] = [];
 
 /* ---------- i18n ---------- */
 
 function applyI18n(): void {
   setLang(state.lang);
+  document.title = `MAI-Reel — ${t('app.tagline')}`;
   for (const node of Array.from(document.querySelectorAll<HTMLElement>('[data-i18n]'))) {
     node.textContent = t(node.dataset.i18n!);
   }
   hookInput.placeholder = t('hook.placeholder');
   ctaInput.placeholder = t('cta.placeholder');
   scriptInput.placeholder = t('script.placeholder');
+  // the score details and the director log are baked strings: rebuild them in the new language
+  if (lastStats && score) score = scoreProject(state.project, lastStats);
   renderScore();
   renderStrip();
   renderBlocks();
+  renderReasons();
 }
 
 /* ---------- media ---------- */
@@ -807,6 +819,7 @@ async function analyze(): Promise<void> {
   player.pause();
   try {
     const media = await analyzeMedia(state.project, assetById);
+    lastStats = media;
     score = scoreProject(state.project, media);
     scoreStale = false;
   } finally {
@@ -1093,9 +1106,10 @@ function markPreset(): void {
   }
 }
 
-$('lang').addEventListener('click', () => {
-  state.lang = state.lang === 'es' ? 'en' : 'es';
+$<HTMLSelectElement>('lang').addEventListener('change', (e) => {
+  state.lang = (e.target as HTMLSelectElement).value as Lang;
   applyI18n();
+  if (state.audio) renderAudio();
 });
 
 document.querySelectorAll<HTMLButtonElement>('[data-goto]').forEach((btn, i, all) => {
@@ -1171,6 +1185,12 @@ function applyPack(id: string): void {
   markPacks();
 }
 
+function renderReasons(): void {
+  $('autoWhy').textContent = lastReasons.length
+    ? lastReasons.map(formatReason).join(' · ')
+    : t('action.autoHint');
+}
+
 function markPacks(): void {
   for (const btn of Array.from(document.querySelectorAll<HTMLElement>('[data-pack]'))) {
     btn.setAttribute('aria-pressed', String(btn.dataset.pack === state.packId));
@@ -1184,6 +1204,7 @@ async function autoEdit(): Promise<void> {
   player.pause();
   try {
     const stats = await analyzeMedia(state.project, assetById);
+    lastStats = stats;
     const assetRank = new Map<string, number>();
     for (const clip of state.project.clips) {
       const stat = stats.perClip.find((c) => c.clipId === clip.id);
@@ -1215,7 +1236,8 @@ async function autoEdit(): Promise<void> {
     applyAspect(state.project.aspect);
     score = scoreProject(state.project, stats);
     scoreStale = false;
-    $('autoWhy').textContent = result.reasons.join(' · ');
+    lastReasons = result.reasons;
+    renderReasons();
     player.seek(0);
     updateTransport();
     renderTicks();

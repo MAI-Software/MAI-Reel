@@ -26,7 +26,7 @@ Todo el procesamiento ocurre en el navegador: ningún archivo se sube a ningún 
 - **Transiciones**: corte, fundido, zoom, deslizar, latigazo con desenfoque de movimiento, flash, empuje vertical y barrido circular.
 - **Animación de textos**: fundido, pop, subida, rebote, máquina de escribir y karaoke (las palabras ya dichas se colorean).
 - **Exportación**: grabación del canvas en tiempo real (`MediaRecorder`), MP4 si el navegador lo soporta, si no WebM.
-- **Bilingüe** ES / EN.
+- **Cinco idiomas** — español, inglés, francés, alemán e italiano — con selector desplegable en la cabecera. Se traduce toda la interfaz, incluidos los consejos del score, las mediciones del desglose y el registro de decisiones del director automático. La primera visita usa el idioma del navegador y la elección queda guardada.
 
 ## Cómo se calcula el índice de viralidad
 
