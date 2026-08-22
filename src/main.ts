@@ -69,6 +69,7 @@ function shell(): string {
   </header>
 
   <main class="layout">
+    <div class="col col--left">
     <section class="panel panel--media" aria-label="media" id="panel-media">
       <div class="dropzone" id="drop">
         <h2 data-i18n="drop.title"></h2>
@@ -85,31 +86,6 @@ function shell(): string {
         <span class="empty-note" id="mediaCount"></span>
         <button class="btn btn--ghost btn--sm" id="clear">${icons.trash}<span data-i18n="media.clear"></span></button>
       </div>
-    </section>
-
-    <section class="stage" id="stage">
-      <div class="viewport" id="viewport">
-        <div class="viewport__empty" id="viewportEmpty">
-          <ol class="steps">
-            <li data-i18n="onboard.1"></li>
-            <li data-i18n="onboard.2"></li>
-            <li data-i18n="onboard.3"></li>
-          </ol>
-        </div>
-      </div>
-      <div class="transport">
-        <button class="btn btn--icon" id="play" aria-label="play">${icons.play}</button>
-        <div class="scrubwrap">
-          <input type="range" id="scrub" min="0" max="1" step="0.02" value="0" aria-label="timeline" />
-          <div class="ticks" id="ticks" aria-hidden="true"></div>
-        </div>
-        <span class="time" id="time">0.0 / 0.0s</span>
-      </div>
-      <div class="row stage__actions">
-        <button class="btn btn--accent" id="export">${icons.download}<span data-i18n="action.export"></span></button>
-        <label class="toggle"><input type="checkbox" id="safe" /><span data-i18n="safe.label"></span></label>
-      </div>
-      <p class="empty-note" data-i18n="export.hint"></p>
     </section>
 
     <section class="panel panel--edit" aria-label="edit" id="panel-edit">
@@ -150,25 +126,29 @@ function shell(): string {
           <select id="style">${TEXT_STYLES.map((s) => `<option value="${s.id}">${s.label}</option>`).join('')}</select>
         </div>
       </div>
-      <div class="field">
-        <label for="hook" data-i18n="hook.label"></label>
-        <input type="text" id="hook" maxlength="80" />
+      <div class="grid-2">
+        <div class="field">
+          <label for="hook" data-i18n="hook.label"></label>
+          <input type="text" id="hook" maxlength="80" />
+        </div>
+        <div class="field">
+          <label for="cta" data-i18n="cta.label"></label>
+          <input type="text" id="cta" maxlength="60" />
+        </div>
       </div>
-      <div class="field">
-        <label for="cta" data-i18n="cta.label"></label>
-        <input type="text" id="cta" maxlength="60" />
-      </div>
-      <div class="field">
-        <label for="script" data-i18n="script.label"></label>
-        <textarea id="script" rows="4"></textarea>
-        <span class="empty-note" data-i18n="script.hint"></span>
-        <button class="btn" id="captions">${icons.captions}<span data-i18n="script.generate"></span></button>
-      </div>
-      <div class="field">
-        <label data-i18n="audio.label"></label>
+      <details class="disclosure">
+        <summary>${icons.captions}<span data-i18n="group.captions"></span></summary>
+        <div class="field">
+          <textarea id="script" rows="3"></textarea>
+          <span class="empty-note" data-i18n="script.hint"></span>
+          <button class="btn btn--sm" id="captions">${icons.captions}<span data-i18n="script.generate"></span></button>
+        </div>
+      </details>
+      <details class="disclosure" id="audioGroup">
+        <summary>${icons.music}<span data-i18n="group.audio"></span></summary>
         <div class="row">
-          <button class="btn" id="audioPick">${icons.music}<span data-i18n="audio.pick"></span></button>
-          <button class="btn btn--ghost" id="audioClear">${icons.close}<span data-i18n="audio.remove"></span></button>
+          <button class="btn btn--sm" id="audioPick">${icons.music}<span data-i18n="audio.pick"></span></button>
+          <button class="btn btn--sm btn--ghost" id="audioClear">${icons.close}<span data-i18n="audio.remove"></span></button>
         </div>
         <span class="empty-note" id="audioName" data-i18n="audio.none"></span>
         <input type="file" id="audioFile" accept="audio/*" hidden />
@@ -181,11 +161,38 @@ function shell(): string {
           <label class="toggle"><input type="checkbox" id="snapBeats" /><span data-i18n="audio.sync"></span></label>
           <button class="btn btn--sm" id="audioPreview">${icons.play}<span data-i18n="audio.preview"></span></button>
         </div>
-      </div>
+      </details>
       <button class="btn btn--primary" id="rebuild">${icons.wand}<span data-i18n="action.rebuild"></span></button>
       <span class="empty-note" data-i18n="action.rebuildWarn"></span>
     </section>
+    </div>
 
+    <section class="stage" id="stage">
+      <div class="viewport" id="viewport">
+        <div class="viewport__empty" id="viewportEmpty">
+          <ol class="steps">
+            <li data-i18n="onboard.1"></li>
+            <li data-i18n="onboard.2"></li>
+            <li data-i18n="onboard.3"></li>
+          </ol>
+        </div>
+      </div>
+      <div class="transport">
+        <button class="btn btn--icon" id="play" aria-label="play">${icons.play}</button>
+        <div class="scrubwrap">
+          <input type="range" id="scrub" min="0" max="1" step="0.02" value="0" aria-label="timeline" />
+          <div class="ticks" id="ticks" aria-hidden="true"></div>
+        </div>
+        <span class="time" id="time">0.0 / 0.0s</span>
+      </div>
+      <div class="row stage__actions">
+        <button class="btn btn--accent" id="export">${icons.download}<span data-i18n="action.export"></span></button>
+        <label class="toggle"><input type="checkbox" id="safe" /><span data-i18n="safe.label"></span></label>
+      </div>
+      <p class="empty-note" data-i18n="export.hint"></p>
+    </section>
+
+    <div class="col col--right">
     <section class="panel panel--blocks" aria-label="blocks" id="panel-blocks">
       <h2 class="panel__title" data-i18n="nav.blocks"></h2>
       <div id="blocks"></div>
@@ -200,6 +207,7 @@ function shell(): string {
         ${SOURCES.map((s) => `<a href="${s.url}" target="_blank" rel="noopener noreferrer">${s.label}</a>`).join('')}
       </div>
     </section>
+    </div>
   </main>
 
   <footer class="footer">
@@ -313,8 +321,12 @@ function showImportProgress(done: number, total: number): void {
 async function addFiles(files: File[]): Promise<void> {
   if (!files.length) return;
   showImportProgress(0, files.length);
-  const added = await loadFiles(files, (done) => showImportProgress(done, files.length));
-  showImportProgress(files.length, files.length);
+  let added: Awaited<ReturnType<typeof loadFiles>> = [];
+  try {
+    added = await loadFiles(files, (done) => showImportProgress(done, files.length));
+  } finally {
+    importProgress.hidden = true;
+  }
   if (!added.length) return;
 
   const hadClips = state.project.clips.length > 0;
@@ -967,6 +979,7 @@ $<HTMLInputElement>('audioFile').addEventListener('change', async (e) => {
   state.audio?.el.pause();
   state.audio = track;
   $('audioName').textContent = file.name;
+  ($('audioGroup') as HTMLDetailsElement).open = true;
   audioInRange.value = '0';
   renderAudio();
   if (track.bpm) toast(`${track.bpm} BPM · ${track.beats.length} ${t('audio.beats')}`);
@@ -1050,14 +1063,18 @@ function syncHeaderHeight(): void {
   document.body.style.setProperty('--header-h', `${Math.round(h)}px`);
 }
 new ResizeObserver(syncHeaderHeight).observe($('topbar'));
-wideScreen.addEventListener('change', () => {
-  if (exporting) return;
+function syncPreviewScale(): void {
+  if (exporting || renderer.canvas.width === Math.round(SIZES[state.project.aspect][0] * previewScale())) return;
   renderer.setScale(previewScale());
   applyAspect(state.project.aspect);
   player.seek(state.time);
+}
+wideScreen.addEventListener('change', syncPreviewScale);
+window.addEventListener('resize', () => {
+  syncHeaderHeight();
+  syncPreviewScale();
+  if (state.audio) drawWaveform(wave, state.audio, Number(targetRange.value), state.time);
 });
-window.addEventListener('resize', syncHeaderHeight);
-
 window.addEventListener('scroll', () => {
   document.body.dataset.scrolled = String(window.scrollY > 12);
 }, { passive: true });

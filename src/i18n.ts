@@ -163,6 +163,8 @@ const es: Dict = {
   'audio.preview': 'Probar desde el principio',
   'audio.beats': 'golpes',
   'audio.nobeats': 'Sin ritmo detectable en este audio',
+  'group.captions': 'Guion y subtítulos',
+  'group.audio': 'Audio y ritmo',
 };
 
 const en: Dict = {
@@ -308,6 +310,8 @@ const en: Dict = {
   'audio.preview': 'Play from the start',
   'audio.beats': 'beats',
   'audio.nobeats': 'No detectable beat in this audio',
+  'group.captions': 'Script and captions',
+  'group.audio': 'Audio and beat',
 };
 
 const DICTS: Record<Lang, Dict> = { es, en };

@@ -47,10 +47,12 @@ Cada punto perdido genera un consejo concreto, ordenado por puntos perdidos y en
 
 ## Interfaz
 
-- **Header sticky** con marca, chip de score en vivo (toca para saltar al desglose) y cambio de idioma; se compacta al hacer scroll.
-- **Preview pegajoso en móvil**: el reel queda anclado bajo la cabecera mientras editas bloques, así ves el cambio sin volver arriba.
+- **Sin scroll de página**: la app ocupa exactamente el alto de la ventana (`100dvh`). Cabecera, columnas, pie y barra de pestañas son bandas fijas; solo hacen scroll las listas que lo necesitan (edición, bloques, score), cada una dentro de su panel.
+- **Header** con marca, chip de score en vivo (toca para saltar al desglose) y cambio de idioma.
+- **Preview siempre visible**: en escritorio ocupa la columna central completa; en móvil queda fijo arriba y se reduce automáticamente al entrar en Edición o Bloques para dejar sitio a los controles.
 - **Barra de tiempo con marcas** de cada corte, atajos de teclado (espacio = play/pausa, flechas = ±0,2 s) y salto directo desde cada bloque.
 - **Score automático**: se recalcula solo 1,4 s después de cada edición; el chip avisa cuando está pendiente.
+- **Divulgación progresiva**: guion/subtítulos y audio viven en grupos plegables, así los controles esenciales caben sin desplazarse.
 - **Estados**: onboarding de 3 pasos en el visor vacío, barra de progreso al importar, porcentaje real durante la exportación y avisos en `aria-live`.
 - **Navegación**: pestañas en móvil con contadores, flechas del teclado y `#hash` en la URL para compartir sección; tres columnas en escritorio.
 - **Rendimiento**: la previsualización se renderiza al 45-60 % de la resolución final y sube a 1080×1920 solo al exportar.
