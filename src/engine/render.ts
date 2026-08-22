@@ -1,4 +1,4 @@
-import type { Aspect, Effect, MediaAsset, Project, TextOverlay } from '../types';
+import type { Aspect, Effect, Enhance, Grade, MediaAsset, Project, TextOverlay } from '../types';
 import { fontCss, styleById } from '../data/typography';
 
 export const SIZES: Record<Aspect, [number, number]> = {
@@ -29,6 +29,20 @@ export function clipIndexAt(p: Project, t: number): number {
 const smooth = (p: number) => p * p * (3 - 2 * p);
 const easeOut = (p: number) => 1 - (1 - p) ** 3;
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+export const GRADE_FILTERS: Record<Grade, string> = {
+  none: '',
+  vivid: 'saturate(1.35) contrast(1.12)',
+  warm: 'sepia(0.18) saturate(1.22) brightness(1.03)',
+  cool: 'saturate(1.12) hue-rotate(12deg) contrast(1.06)',
+  mono: 'grayscale(1) contrast(1.16)',
+  film: 'sepia(0.26) saturate(0.86) contrast(1.1) brightness(0.98)',
+  vhs: 'saturate(1.45) contrast(0.94) hue-rotate(-6deg) brightness(1.05)',
+  dream: 'brightness(1.07) saturate(1.18) contrast(0.92)',
+  night: 'brightness(0.86) contrast(1.2) saturate(0.82)',
+};
+
+const VIGNETTE: Grade[] = ['film', 'vhs', 'night'];
 
 interface Motion {
   zoom: number;
@@ -80,6 +94,46 @@ function effectMotion(effect: Effect, p: number, seconds: number): Motion {
     default:
       return base;
   }
+}
+
+/**
+ * Audio-reactive camera move for the entertainment mode: it never adds pixels on top of the
+ * footage, it only breathes the framing so already-edited clips keep their captions intact.
+ */
+export function enhanceMotion(en: Enhance, t: number): Motion {
+  const base: Motion = { zoom: 1, panX: 0, panY: 0, rot: 0, blur: 0 };
+  if (!en.enabled) return base;
+  const k = Math.max(0, Math.min(1, en.intensity));
+  const idx = Math.floor(t * en.hz);
+  const energy = en.envelope.length ? (en.envelope[Math.min(idx, en.envelope.length - 1)] ?? 0) : 0.3;
+
+  let pulse = 0;
+  for (const b of en.beats) {
+    const d = t - b;
+    if (d < -0.05) break;
+    if (d >= -0.05 && d < 0.55) pulse = Math.max(pulse, Math.exp(-Math.max(0, d) * 7));
+  }
+
+  const zoomCap = en.protectCaptions ? 0.06 : 0.16;
+  const zoom = 1 + k * Math.min(zoomCap, 0.02 + 0.035 * energy + 0.07 * pulse);
+
+  let panX = 0;
+  let panY = 0;
+  if (en.faceZoom && en.focus) {
+    const pull = k * (0.35 + 0.4 * pulse);
+    panX = -(en.focus.x - 0.5) * 2 * pull;
+    panY = (0.5 - en.focus.y) * 2 * pull;
+  }
+  if (en.shake) {
+    const amp = k * (0.006 + 0.018 * energy);
+    panX += Math.sin(t * 12.7) * amp;
+    panY += Math.cos(t * 9.3) * amp;
+  }
+  const clampPan = en.protectCaptions ? 0.15 : 0.5;
+  panX = Math.max(-clampPan, Math.min(clampPan, panX));
+  panY = Math.max(-clampPan, Math.min(clampPan, panY));
+
+  return { zoom, panX, panY, rot: en.shake ? Math.sin(t * 5.1) * 0.003 * k * (0.4 + energy) : 0, blur: 0 };
 }
 
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
@@ -150,14 +204,31 @@ export class ReelRenderer {
     this.lastIndex = -1;
   }
 
-  private drawMedia(asset: MediaAsset, effect: Effect, p: number, seconds: number, alpha: number): void {
+  private drawMedia(
+    asset: MediaAsset,
+    effect: Effect,
+    p: number,
+    seconds: number,
+    alpha: number,
+    grade: Grade = 'none',
+    extra?: Motion,
+  ): void {
     const { ctx } = this;
     const dw = this.canvas.width;
     const dh = this.canvas.height;
     const sw = asset.width;
     const sh = asset.height;
     if (!sw || !sh) return;
-    const m = effectMotion(effect, p, seconds);
+    const eff = effectMotion(effect, p, seconds);
+    const m: Motion = extra
+      ? {
+          zoom: eff.zoom * extra.zoom,
+          panX: Math.max(-1, Math.min(1, eff.panX + extra.panX)),
+          panY: Math.max(-1, Math.min(1, eff.panY + extra.panY)),
+          rot: eff.rot + extra.rot,
+          blur: Math.max(eff.blur, extra.blur),
+        }
+      : eff;
     const scale = Math.max(dw / sw, dh / sh) * m.zoom;
     const w = sw * scale;
     const h = sh * scale;
@@ -166,7 +237,13 @@ export class ReelRenderer {
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    if (m.blur > 0.2) ctx.filter = `blur(${(m.blur * this.unit).toFixed(1)}px)`;
+    const filters = [
+      m.blur > 0.2 ? `blur(${(m.blur * this.unit).toFixed(1)}px)` : '',
+      GRADE_FILTERS[grade] ?? '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    if (filters) ctx.filter = filters;
     if (m.rot) {
       ctx.translate(dw / 2, dh / 2);
       ctx.rotate(m.rot);
@@ -177,6 +254,21 @@ export class ReelRenderer {
     } catch {
       /* frame not decodable yet */
     }
+    ctx.restore();
+    if (VIGNETTE.includes(grade)) this.drawVignette(alpha);
+  }
+
+  private drawVignette(alpha: number): void {
+    const { ctx } = this;
+    const dw = this.canvas.width;
+    const dh = this.canvas.height;
+    const g = ctx.createRadialGradient(dw / 2, dh / 2, Math.min(dw, dh) * 0.34, dw / 2, dh / 2, Math.max(dw, dh) * 0.72);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.42)');
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, dw, dh);
     ctx.restore();
   }
 
@@ -266,10 +358,17 @@ export class ReelRenderer {
       if (style.glow) {
         ctx.shadowColor = style.glow.color;
         ctx.shadowBlur = size * style.glow.blur;
+      } else if (style.shadow) {
+        ctx.shadowColor = style.shadow.color;
+        ctx.shadowBlur = size * (style.shadow.blur ?? 0.04);
+        ctx.shadowOffsetX = size * style.shadow.dx;
+        ctx.shadowOffsetY = size * style.shadow.dy;
       }
       ctx.fillStyle = style.fill;
       ctx.fillText(line, dw / 2, y);
       ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
     });
 
     if ('letterSpacing' in ctx) {
@@ -357,9 +456,18 @@ export class ReelRenderer {
       if (raw < 1) this.drawOutgoing(clip.transition, tp);
 
       if (asset) {
+        const extra = project.enhance?.enabled ? enhanceMotion(project.enhance, t) : undefined;
         ctx.save();
         this.applyIncoming(clip.transition, tp, raw);
-        this.drawMedia(asset, clip.effect, p, t, clip.transition === 'fade' || clip.transition === 'zoom' ? tp : 1);
+        this.drawMedia(
+          asset,
+          clip.effect,
+          p,
+          t,
+          clip.transition === 'fade' || clip.transition === 'zoom' ? tp : 1,
+          clip.grade ?? 'none',
+          extra,
+        );
         ctx.restore();
         if (clip.transition === 'flash' && raw < 1) {
           ctx.save();

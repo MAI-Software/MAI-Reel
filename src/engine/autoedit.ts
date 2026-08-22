@@ -1,4 +1,4 @@
-import type { Aspect, Clip, Effect, MediaAsset, Project, TemplateId, TextAnim, TextOverlay, Transition } from '../types';
+import type { Aspect, Clip, Effect, Enhance, MediaAsset, Project, TemplateId, TextAnim, TextOverlay, Transition } from '../types';
 import { uid } from '../state';
 import { DEFAULT_FONT, DEFAULT_STYLE } from '../data/typography';
 
@@ -58,6 +58,7 @@ export interface BuildOptions {
   beats?: number[];
   /** Optional script: split into timed caption blocks over the whole reel. */
   script?: string;
+  enhance?: Enhance;
 }
 
 /** Builds a full timeline from the imported assets: durations, effects, transitions and text. */
@@ -85,6 +86,7 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
         srcIn: 0,
         effect: asset.kind === 'video' ? 'none' : spec.effects[i % spec.effects.length]!,
         transition: i === 0 ? 'cut' : spec.transitions[i % spec.transitions.length]!,
+        grade: 'none',
       });
       cursor += clips[clips.length - 1]!.duration;
     });
@@ -104,6 +106,7 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
       srcIn: 0,
       effect: asset.kind === 'video' ? 'none' : spec.effects[i % spec.effects.length]!,
       transition: i === 0 ? 'cut' : spec.transitions[i % spec.transitions.length]!,
+      grade: 'none',
     });
     cursor += duration;
   });
@@ -123,6 +126,7 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
         srcIn: 0,
         effect: spec.effects[i % spec.effects.length]!,
         transition: spec.transitions[i % spec.transitions.length]!,
+        grade: 'none',
       });
       cursor += duration;
       i++;
@@ -167,7 +171,66 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
     });
   }
 
-  return { aspect: opts.aspect, fps: 30, template: opts.template, clips, texts, fontId, styleId };
+  return {
+    aspect: opts.aspect,
+    fps: 30,
+    mode: 'edit',
+    template: opts.template,
+    clips,
+    texts,
+    fontId,
+    styleId,
+    enhance: opts.enhance ?? idleEnhance(),
+  };
+}
+
+export function idleEnhance(): Enhance {
+  return {
+    enabled: false,
+    intensity: 0.6,
+    envelope: [],
+    hz: 20,
+    beats: [],
+    focus: null,
+    protectCaptions: true,
+    shake: true,
+    faceZoom: true,
+  };
+}
+
+export interface EntertainOptions {
+  aspect: Aspect;
+  duration: number;
+  enhance: Enhance;
+}
+
+/**
+ * Entertainment mode: one continuous shot over an already-edited video. No cuts, no overlays,
+ * nothing that could cover a face or burned-in captions — only the audio-reactive camera move.
+ */
+export function buildEntertainProject(asset: MediaAsset, opts: EntertainOptions): Project {
+  return {
+    aspect: opts.aspect,
+    fps: 30,
+    mode: 'entertain',
+    template: 'flow',
+    clips: [
+      {
+        id: uid('c'),
+        assetId: asset.id,
+        start: 0,
+        duration: Math.max(1, opts.duration),
+        srcIn: 0,
+        effect: 'none',
+        transition: 'cut',
+        grade: 'none',
+      },
+    ],
+    texts: [],
+    fontId: DEFAULT_FONT,
+    styleId: DEFAULT_STYLE,
+    enhance: opts.enhance,
+  };
 }
 
 const MAX_CAPTION_CHARS = 34;
@@ -241,6 +304,7 @@ export function appendAssets(project: Project, assets: MediaAsset[]): Project {
       srcIn: 0,
       effect: asset.kind === 'video' ? 'none' : spec.effects[(idx + i) % spec.effects.length]!,
       transition: idx === 0 ? 'cut' : spec.transitions[(idx + i) % spec.transitions.length]!,
+      grade: project.clips[project.clips.length - 1]?.grade ?? 'none',
     });
     cursor += duration;
   });

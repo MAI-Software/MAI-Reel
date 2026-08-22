@@ -1118,6 +1118,69 @@ body[data-scrolled='true'] .topbar {
   }
 }
 
+/* ---------- mode switch, packs, entertainment ---------- */
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--muted);
+}
+
+.segmented button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-dim);
+  font-weight: 700;
+  font-size: 13px;
+  transition: background 160ms ease-out, color 160ms ease-out;
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--primary);
+  color: #fff;
+}
+
+.chips--wrap {
+  max-height: 96px;
+  overflow-y: auto;
+}
+
+.chips--wrap button {
+  font-size: 12px;
+  padding: 4px 10px;
+  min-height: 34px;
+}
+
+.entertain {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+/* entertainment mode never writes on top of the footage, so those controls step aside */
+body[data-mode='entertain'] #packField,
+body[data-mode='entertain'] #autoField,
+body[data-mode='entertain'] .panel--edit .disclosure,
+body[data-mode='entertain'] .panel--edit .grid-2:nth-of-type(n + 2),
+body[data-mode='entertain'] #rebuild,
+body[data-mode='entertain'] .panel--edit > .field:not(#entertainField) {
+  display: none;
+}
+
+body[data-mode='entertain'] .panel--blocks {
+  display: none;
+}
+
 /* ---------- disclosure groups ---------- */
 
 .disclosure {

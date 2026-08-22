@@ -124,6 +124,56 @@ function detectBeats(mono: Float32Array, sampleRate: number): { beats: number[];
   return { beats, bpm };
 }
 
+export interface SourceAudio {
+  /** RMS envelope normalised to 0..1, sampled at `hz`. */
+  envelope: number[];
+  hz: number;
+  beats: number[];
+  bpm: number;
+  duration: number;
+}
+
+const ENVELOPE_HZ = 20;
+
+function computeEnvelope(mono: Float32Array, sampleRate: number): number[] {
+  const frame = Math.max(1, Math.round(sampleRate / ENVELOPE_HZ));
+  const out: number[] = [];
+  let max = 0.0001;
+  for (let i = 0; i < mono.length; i += frame) {
+    let sum = 0;
+    let n = 0;
+    for (let k = i; k < i + frame && k < mono.length; k += 2) {
+      sum += mono[k]! * mono[k]!;
+      n++;
+    }
+    const rms = Math.sqrt(sum / (n || 1));
+    out.push(rms);
+    if (rms > max) max = rms;
+  }
+  return out.map((v) => Math.min(1, v / max));
+}
+
+/** Decodes the audio of any media file (audio or video) for beat and loudness analysis. */
+export async function analyzeFileAudio(file: File): Promise<SourceAudio | null> {
+  const ctx = new AudioContext();
+  try {
+    const buffer = await ctx.decodeAudioData(await file.arrayBuffer());
+    const mono = downmix(buffer);
+    const { beats, bpm } = detectBeats(mono, buffer.sampleRate);
+    return {
+      envelope: computeEnvelope(mono, buffer.sampleRate),
+      hz: ENVELOPE_HZ,
+      beats,
+      bpm,
+      duration: buffer.duration,
+    };
+  } catch {
+    return null;
+  } finally {
+    void ctx.close();
+  }
+}
+
 export async function loadAudioFile(file: File): Promise<AudioTrack> {
   const url = URL.createObjectURL(file);
   const el = new Audio(url);

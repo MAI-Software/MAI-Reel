@@ -7,11 +7,16 @@ Todo el procesamiento ocurre en el navegador: ningún archivo se sube a ningún 
 ## Qué hace
 
 - **Importación**: imágenes (JPG/PNG/WebP) y vídeo (MP4/MOV/WebM) por selector o arrastrando.
+- **Montaje automático (director)**: mide el material (luz, contraste, nitidez, color, movimiento) y la música (BPM y golpes), decide plantilla, duración, color y tipografía, genera tres versiones distintas, las puntúa con la misma rúbrica pública y se queda con la mejor. Explica en pantalla por qué eligió cada cosa.
+- **Estilos rápidos**: 12 packs de un toque (Viral, Vlog, Cine, Retro VHS, Neón, Ensueño, Deporte, Lujo, Documental, Karaoke, Fresco, Titular) que fijan ritmo, color, fuente, estilo de texto y animación a la vez.
+- **Color por plano**: 9 looks (vívido, cálido, frío, blanco y negro, cine, VHS, ensueño, noche) con viñeta automática en los cinematográficos.
+- **Texto por escena**: cada plano tiene su botón para añadir un texto que dura exactamente ese plano.
+- **Modo entretenimiento**: para vídeos que ya vienen montados de CapCut con sus subtítulos incrustados. No añade textos ni cortes: decodifica el audio del propio vídeo, detecta golpes y volumen, localiza al sujeto por tono de piel y aplica un movimiento de cámara sutil —tambaleo al ritmo, micro-zoom en los golpes, acercamiento hacia la cara— con tope de zoom y desplazamiento limitados para que los subtítulos incrustados nunca salgan del encuadre.
 - **Montaje automático**: tres plantillas de ritmo — `Punch` (cortes rápidos), `Flow` (medio), `Story` (narrativo). Reparte duraciones, alterna efectos Ken Burns (zoom in/out, paneos) y transiciones (corte, fundido, zoom, slide). Con pocas fotos, `Punch` recicla el material para mantener la cadencia; `Flow` y `Story` alargan cada plano.
 - **Textos**: gancho inicial y llamada a la acción final, con contorno legible y respeto de las zonas seguras del formato.
 - **Subtítulos automáticos**: pegas el guion y se reparte en bloques cronometrados (~34 caracteres) repartidos por la duración del reel, entre el gancho y el CTA.
 - **Tipografías**: Anton, Bebas Neue, Montserrat, Poppins, Archivo Black y Atkinson Hyperlegible, con corrección óptica de tamaño por familia.
-- **Estilos de texto**: Outline, Box, Pop, Neon, Bar y Clean (relleno, contorno, fondo, glow, mayúsculas y tracking).
+- **Estilos de texto**: 16 presets (Outline, Box, Pop, Neon, Bar, Clean, Shadow, Sticker, Mint, Cyber, Alert, Gold, Ghost, Ocean, Contrast, Lemon) con relleno, contorno, fondo, glow, sombra dura, mayúsculas y tracking.
 - **Edición por bloques**: cada plano se retoca por separado (efecto, transición de entrada, duración, punto de inicio del vídeo, reordenar, eliminar) y cada texto también (contenido, fuente, estilo, posición, tamaño, entrada y salida).
 - **Material acumulable**: puedes añadir más fotos o vídeos en cualquier momento y se anexan al final sin perder las ediciones manuales. `Regenerar montaje` sí rehace todo desde cero.
 - **Formatos**: 9:16 (1080×1920), 4:5 y 1:1.

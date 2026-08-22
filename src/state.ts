@@ -10,6 +10,8 @@ export interface AppState {
   playing: boolean;
   lang: 'es' | 'en';
   showSafeZones: boolean;
+  /** Currently applied quick-style pack. */
+  packId: string | null;
 }
 
 export const state: AppState = {
@@ -18,16 +20,29 @@ export const state: AppState = {
     aspect: '9:16',
     fps: 30,
     template: 'punch',
+    mode: 'edit',
     clips: [],
     texts: [],
     fontId: DEFAULT_FONT,
     styleId: DEFAULT_STYLE,
+    enhance: {
+      enabled: false,
+      intensity: 0.6,
+      envelope: [],
+      hz: 20,
+      beats: [],
+      focus: null,
+      protectCaptions: true,
+      shake: true,
+      faceZoom: true,
+    },
   },
   audio: null,
   time: 0,
   playing: false,
   lang: (localStorage.getItem('mai-reel-lang') as 'es' | 'en') ?? 'es',
   showSafeZones: false,
+  packId: null,
 };
 
 type Listener = () => void;

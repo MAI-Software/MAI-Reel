@@ -31,6 +31,30 @@ function loadVideo(url: string): Promise<HTMLVideoElement> {
   });
 }
 
+/**
+ * Files recorded by MediaRecorder (and some WhatsApp exports) report `Infinity` as duration
+ * until the element is seeked past the end, so force it before trusting the value.
+ */
+async function resolveDuration(v: HTMLVideoElement): Promise<number> {
+  if (Number.isFinite(v.duration) && v.duration > 0) return v.duration;
+  await new Promise<void>((resolve) => {
+    const onChange = () => {
+      if (Number.isFinite(v.duration)) {
+        v.removeEventListener('durationchange', onChange);
+        resolve();
+      }
+    };
+    v.addEventListener('durationchange', onChange);
+    v.currentTime = 1e6;
+    setTimeout(() => {
+      v.removeEventListener('durationchange', onChange);
+      resolve();
+    }, 2000);
+  });
+  v.currentTime = 0;
+  return Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0;
+}
+
 /** Turns picked files into decoded assets. Unsupported files are skipped. */
 export async function loadFiles(
   files: File[],
@@ -52,9 +76,11 @@ export async function loadFiles(
           width: el.naturalWidth,
           height: el.naturalHeight,
           srcDuration: 0,
+          file,
         });
       } else if (VIDEO_RE.test(file.type)) {
         const el = await loadVideo(url);
+        const srcDuration = await resolveDuration(el);
         out.push({
           id: uid('a'),
           kind: 'video',
@@ -63,7 +89,8 @@ export async function loadFiles(
           el,
           width: el.videoWidth,
           height: el.videoHeight,
-          srcDuration: Number.isFinite(el.duration) ? el.duration : 0,
+          srcDuration,
+          file,
         });
       } else {
         URL.revokeObjectURL(url);

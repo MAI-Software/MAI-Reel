@@ -28,6 +28,8 @@ export interface TextStyleDef {
   strokeWidth?: number;
   bg?: string;
   glow?: { color: string; blur: number };
+  /** Hard drop shadow, offsets as a fraction of the font size. */
+  shadow?: { color: string; dx: number; dy: number; blur?: number };
   uppercase?: boolean;
   /** Letter spacing as a fraction of the font size */
   tracking?: number;
@@ -40,6 +42,16 @@ export const TEXT_STYLES: TextStyleDef[] = [
   { id: 'neon', label: 'Neon', fill: '#FFFFFF', stroke: '#3B0764', strokeWidth: 0.08, glow: { color: '#EC4899', blur: 0.45 } },
   { id: 'bar', label: 'Bar', fill: '#FFFFFF', bg: '#EC4899' },
   { id: 'clean', label: 'Clean', fill: '#FFFFFF' },
+  { id: 'shadow', label: 'Shadow', fill: '#FFFFFF', shadow: { color: 'rgba(4,7,18,0.85)', dx: 0.06, dy: 0.07 }, uppercase: true },
+  { id: 'sticker', label: 'Sticker', fill: '#0F172A', bg: '#FFFFFF' },
+  { id: 'mint', label: 'Mint', fill: '#04070F', bg: '#3BF0C0' },
+  { id: 'cyber', label: 'Cyber', fill: '#00E5FF', stroke: '#04070F', strokeWidth: 0.1, glow: { color: '#00E5FF', blur: 0.4 }, uppercase: true, tracking: 0.04 },
+  { id: 'alert', label: 'Alert', fill: '#FFFFFF', bg: '#DC2626', uppercase: true },
+  { id: 'gold', label: 'Gold', fill: '#FFD166', stroke: '#2B1B00', strokeWidth: 0.14, uppercase: true, tracking: 0.06 },
+  { id: 'ghost', label: 'Ghost', fill: 'rgba(255,255,255,0.94)', bg: 'rgba(4,7,18,0.28)' },
+  { id: 'ocean', label: 'Ocean', fill: '#FFFFFF', bg: '#2563EB' },
+  { id: 'contrast', label: 'Contrast', fill: '#04070F', bg: '#FFFFFF', uppercase: true },
+  { id: 'lemon', label: 'Lemon', fill: '#0F172A', bg: '#FFE55C', uppercase: true },
 ];
 
 export const DEFAULT_STYLE = 'outline';

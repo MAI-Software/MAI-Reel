@@ -10,8 +10,11 @@ import { recordCanvas, downloadBlob, extensionFor, pickMime } from './engine/exp
 import { analyzeMedia } from './analysis/frames';
 import { scoreProject, type ScoreResult } from './analysis/score';
 import { FONTS, TEXT_STYLES, ensureFontsLoaded } from './data/typography';
-import { loadAudioFile, beatsInFragment, drawWaveform } from './engine/audio';
-import type { Aspect, Effect, TemplateId, TextAnim, TextOverlay, Transition } from './types';
+import { loadAudioFile, beatsInFragment, drawWaveform, analyzeFileAudio } from './engine/audio';
+import { STYLE_PACKS, packById, autoDirect } from './engine/director';
+import { buildEntertainProject, idleEnhance } from './engine/autoedit';
+import { detectFocus } from './analysis/focus';
+import type { Aspect, Effect, Grade, ReelMode, TemplateId, TextAnim, TextOverlay, Transition } from './types';
 
 const PARENT_SITE = 'https://mai-softwares.com';
 const REPO = 'https://github.com/MAI-Software/MAI-Reel';
@@ -34,6 +37,7 @@ const EFFECTS: Effect[] = [
 ];
 const TRANSITIONS: Transition[] = ['cut', 'fade', 'zoom', 'slide', 'whip', 'flash', 'push-up', 'wipe'];
 const ANIMS: TextAnim[] = ['fade', 'pop', 'slide-up', 'bounce', 'typewriter', 'karaoke', 'none'];
+const GRADES: Grade[] = ['none', 'vivid', 'warm', 'cool', 'mono', 'film', 'vhs', 'dream', 'night'];
 const LENGTH_PRESETS = [8, 12, 15, 20];
 const MIN_DURATION = 8;
 const POSITIONS: Array<{ id: string; y: number }> = [
@@ -90,6 +94,32 @@ function shell(): string {
 
     <section class="panel panel--edit" aria-label="edit" id="panel-edit">
       <h2 class="panel__title" data-i18n="nav.edit"></h2>
+      <div class="segmented" id="modeSwitch" role="group">
+        <button type="button" data-mode="edit" aria-pressed="true" data-i18n="mode.edit"></button>
+        <button type="button" data-mode="entertain" aria-pressed="false" data-i18n="mode.entertain"></button>
+      </div>
+
+      <div class="entertain" id="entertainBox" hidden>
+        <p class="empty-note" id="entertainInfo" data-i18n="entertain.hint"></p>
+        <label class="block__range"><span data-i18n="entertain.intensity"></span> <output id="enIntensityVal">60%</output>
+          <input type="range" id="enIntensity" min="10" max="100" step="5" value="60" />
+        </label>
+        <label class="toggle"><input type="checkbox" id="enShake" checked /><span data-i18n="entertain.shake"></span></label>
+        <label class="toggle"><input type="checkbox" id="enFace" checked /><span data-i18n="entertain.face"></span></label>
+        <label class="toggle"><input type="checkbox" id="enProtect" checked /><span data-i18n="entertain.protect"></span></label>
+      </div>
+
+      <div class="field" id="autoField">
+        <button class="btn btn--primary" id="auto">${icons.spark}<span data-i18n="action.auto"></span></button>
+        <span class="empty-note" id="autoWhy" data-i18n="action.autoHint"></span>
+      </div>
+
+      <div class="field" id="packField">
+        <label data-i18n="quick.label"></label>
+        <div class="chips chips--wrap" id="packs">
+          ${STYLE_PACKS.map((p) => `<button type="button" data-pack="${p.id}">${p.label}</button>`).join('')}
+        </div>
+      </div>
       <div class="field">
         <label for="template" data-i18n="template.label"></label>
         <select id="template">
@@ -519,7 +549,11 @@ function clipCard(index: number): string {
       <label>${t('clip.transition')}
         <select data-field="transition">${options(TRANSITIONS, clip.transition, (v) => `trans.${v}`)}</select>
       </label>
+      <label>${t('clip.grade')}
+        <select data-field="grade">${options(GRADES, clip.grade ?? 'none', (v) => `grade.${v}`)}</select>
+      </label>
     </div>
+    <button class="btn btn--sm btn--ghost" data-addtext="${clip.id}">${icons.captions}<span>${t('block.addText')}</span></button>
     <label class="block__range">${t('clip.duration')} <output>${clip.duration.toFixed(1)}s</output>
       <input type="range" data-field="duration" min="0.4" max="${isVideo ? Math.max(2, asset?.srcDuration ?? 8).toFixed(1) : 8}" step="0.1" value="${clip.duration}" />
     </label>
@@ -604,6 +638,29 @@ blocksBox.addEventListener('click', (e) => {
     return;
   }
 
+  const addText = target.closest<HTMLElement>('[data-addtext]');
+  if (addText) {
+    const clip = state.project.clips.find((c) => c.id === addText.dataset.addtext);
+    if (clip) {
+      state.project.texts.push({
+        id: uid('t'),
+        text: t('blocks.newText'),
+        start: clip.start + 0.05,
+        end: clip.start + Math.max(0.8, clip.duration - 0.05),
+        role: 'caption',
+        y: 0.5,
+        size: 60,
+        fontId: fontSel.value,
+        styleId: styleSel.value,
+        anim: 'pop',
+      });
+      touch();
+      renderBlocks();
+      player.seek(clip.start);
+    }
+    return;
+  }
+
   const seek = target.closest<HTMLElement>('[data-seek]');
   if (seek) {
     player.pause();
@@ -646,6 +703,7 @@ blocksBox.addEventListener('input', (e) => {
     if (!clip) return;
     if (field === 'effect') clip.effect = input.value as Effect;
     if (field === 'transition') clip.transition = input.value as Transition;
+    if (field === 'grade') clip.grade = input.value as Grade;
     if (field === 'duration') clip.duration = Number(input.value);
     if (field === 'srcIn') clip.srcIn = Number(input.value);
     const out = input.parentElement?.querySelector('output');
@@ -1095,6 +1153,158 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+
+/* ---------- quick styles, auto director, entertainment mode ---------- */
+
+function applyPack(id: string): void {
+  const pack = packById(id);
+  templateSel.value = pack.template;
+  fontSel.value = pack.fontId;
+  styleSel.value = pack.styleId;
+  targetRange.value = String(Math.max(MIN_DURATION, Number(targetRange.value)));
+  state.packId = id;
+  rebuild();
+  for (const clip of state.project.clips) clip.grade = pack.grade;
+  for (const text of state.project.texts) text.anim = pack.anim;
+  touch();
+  renderBlocks();
+  markPacks();
+}
+
+function markPacks(): void {
+  for (const btn of Array.from(document.querySelectorAll<HTMLElement>('[data-pack]'))) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.pack === state.packId));
+  }
+}
+
+async function autoEdit(): Promise<void> {
+  if (!state.assets.length || analyzing) return;
+  analyzing = true;
+  updateTransport();
+  player.pause();
+  try {
+    const stats = await analyzeMedia(state.project, assetById);
+    const assetRank = new Map<string, number>();
+    for (const clip of state.project.clips) {
+      const stat = stats.perClip.find((c) => c.clipId === clip.id);
+      if (!stat) continue;
+      const value = stat.stats.contrast * 0.6 + stat.stats.sharpness * 0.4;
+      assetRank.set(clip.assetId, Math.max(assetRank.get(clip.assetId) ?? 0, value));
+    }
+    const result = autoDirect({
+      assets: state.assets,
+      stats,
+      assetRank,
+      bpm: state.audio?.bpm,
+      beats: currentBeats(),
+      hook: hookInput.value.trim() || undefined,
+      cta: ctaInput.value.trim() || undefined,
+      script: scriptInput.value.trim() || undefined,
+      aspect: aspectSel.value as Aspect,
+    });
+    if (!result) return;
+    state.project = result.project;
+    state.packId = result.decision.pack.id;
+    templateSel.value = result.decision.pack.template;
+    fontSel.value = result.decision.pack.fontId;
+    styleSel.value = result.decision.pack.styleId;
+    targetRange.value = String(result.decision.target);
+    $('targetVal').textContent = `${result.decision.target}s`;
+    markPreset();
+    markPacks();
+    applyAspect(state.project.aspect);
+    score = scoreProject(state.project, stats);
+    scoreStale = false;
+    $('autoWhy').textContent = result.reasons.join(' · ');
+    player.seek(0);
+    updateTransport();
+    renderTicks();
+    renderBlocks();
+    renderScore();
+    toast(`${t('auto.done')} ${result.score}/100`);
+  } finally {
+    analyzing = false;
+    updateTransport();
+  }
+}
+
+function enhanceFromUI(): void {
+  const en = state.project.enhance;
+  en.intensity = Number($<HTMLInputElement>('enIntensity').value) / 100;
+  en.shake = $<HTMLInputElement>('enShake').checked;
+  en.faceZoom = $<HTMLInputElement>('enFace').checked;
+  en.protectCaptions = $<HTMLInputElement>('enProtect').checked;
+  $('enIntensityVal').textContent = `${Math.round(en.intensity * 100)}%`;
+  player.seek(state.time);
+}
+
+async function setMode(mode: ReelMode): Promise<void> {
+  document.body.dataset.mode = mode;
+  for (const btn of Array.from(document.querySelectorAll<HTMLElement>('[data-mode]'))) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.mode === mode));
+  }
+  $('entertainBox').hidden = mode !== 'entertain';
+
+  if (mode === 'edit') {
+    state.project.enhance = idleEnhance();
+    rebuild();
+    return;
+  }
+
+  const video = state.assets.find((a) => a.kind === 'video');
+  if (!video) {
+    toast(t('entertain.needVideo'));
+    void setMode('edit');
+    return;
+  }
+
+  $('entertainInfo').textContent = t('entertain.analyzing');
+  player.pause();
+  const [audio, focus] = await Promise.all([
+    video.file ? analyzeFileAudio(video.file) : Promise.resolve(null),
+    detectFocus(video),
+  ]);
+  const enhance = {
+    ...idleEnhance(),
+    enabled: true,
+    intensity: Number($<HTMLInputElement>('enIntensity').value) / 100,
+    shake: $<HTMLInputElement>('enShake').checked,
+    faceZoom: $<HTMLInputElement>('enFace').checked,
+    protectCaptions: $<HTMLInputElement>('enProtect').checked,
+    envelope: audio?.envelope ?? [],
+    hz: audio?.hz ?? 20,
+    beats: audio?.beats ?? [],
+    focus: focus ? { x: focus.x, y: focus.y } : null,
+  };
+  state.project = buildEntertainProject(video, {
+    aspect: aspectSel.value as Aspect,
+    duration: video.srcDuration || audio?.duration || 15,
+    enhance,
+  });
+  applyAspect(state.project.aspect);
+  player.seek(0);
+  touch();
+  renderBlocks();
+  $('entertainInfo').textContent = [
+    audio?.bpm ? `${audio.bpm} BPM` : t('entertain.nobeat'),
+    focus ? t('entertain.face.found') : t('entertain.face.none'),
+    t('entertain.ready'),
+  ].join(' · ');
+}
+
+$('packs').addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-pack]');
+  if (btn) applyPack(btn.dataset.pack!);
+});
+$('auto').addEventListener('click', () => void autoEdit());
+$('modeSwitch').addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-mode]');
+  if (btn) void setMode(btn.dataset.mode as ReelMode);
+});
+for (const id of ['enIntensity', 'enShake', 'enFace', 'enProtect']) {
+  $(id).addEventListener('input', enhanceFromUI);
+}
+
 /* ---------- boot ---------- */
 
 const initialTab = (location.hash.slice(1) as Tab) || 'media';
@@ -1104,6 +1314,7 @@ styleSel.value = state.project.styleId;
 applyI18n();
 syncHeaderHeight();
 markPreset();
+markPacks();
 renderAudio();
 rebuild();
 renderStrip();
