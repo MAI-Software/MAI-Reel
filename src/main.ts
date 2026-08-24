@@ -126,6 +126,8 @@ function shell(): string {
           ${STYLE_PACKS.map((p) => `<button type="button" data-pack="${p.id}" data-i18n="pack.${p.id}"></button>`).join('')}
         </div>
       </div>
+      <details class="disclosure" id="settingsGroup">
+        <summary>${icons.sliders}<span data-i18n="group.settings"></span></summary>
       <div class="field">
         <label for="template" data-i18n="template.label"></label>
         <select id="template">
@@ -162,6 +164,9 @@ function shell(): string {
           <select id="style">${TEXT_STYLES.map((s) => `<option value="${s.id}">${s.label}</option>`).join('')}</select>
         </div>
       </div>
+      </details>
+      <details class="disclosure" id="textsGroup">
+        <summary>${icons.captions}<span data-i18n="group.texts"></span></summary>
       <div class="grid-2">
         <div class="field">
           <label for="hook" data-i18n="hook.label"></label>
@@ -172,6 +177,7 @@ function shell(): string {
           <input type="text" id="cta" maxlength="60" />
         </div>
       </div>
+      </details>
       <details class="disclosure">
         <summary>${icons.captions}<span data-i18n="group.captions"></span></summary>
         <div class="field">
@@ -238,6 +244,9 @@ function shell(): string {
       <h2 class="panel__title" data-i18n="score.title"></h2>
       <div id="scoreBody"></div>
       <button class="btn btn--primary" id="analyze">${icons.spark}<span data-i18n="action.analyze"></span></button>
+      <a class="parent-link" href="${PARENT_SITE}" target="_blank" rel="noopener noreferrer">
+        ${brandMark}<span><strong>MAI Softwares</strong><small data-i18n="footer.matriz"></small></span>${icons.external}
+      </a>
       <div class="sources">
         <strong data-i18n="score.sources"></strong>
         ${SOURCES.map((s) => `<a href="${s.url}" target="_blank" rel="noopener noreferrer">${s.label}</a>`).join('')}
@@ -1331,6 +1340,13 @@ for (const id of ['enIntensity', 'enShake', 'enFace', 'enProtect']) {
 
 const initialTab = (location.hash.slice(1) as Tab) || 'media';
 setTab(TABS.includes(initialTab) ? initialTab : 'media', false);
+document.body.dataset.mode = 'edit';
+// the picker has to show the language that was restored from storage or the browser
+$<HTMLSelectElement>('lang').value = state.lang;
+// on a wide screen there is room for everything, so these groups start open
+for (const id of ['settingsGroup', 'textsGroup']) {
+  ($(id) as HTMLDetailsElement).open = wideScreen.matches;
+}
 fontSel.value = state.project.fontId;
 styleSel.value = state.project.styleId;
 applyI18n();
