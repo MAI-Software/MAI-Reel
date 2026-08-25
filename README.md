@@ -10,7 +10,7 @@ La navegación principal son cuatro secciones; cada una muestra solo lo que nece
 
 | Sección | Para qué | Qué ve el usuario |
 |---|---|---|
-| **Transcribir** | "He visto un reel y quiero su texto" | Importar o pegar enlace + botón Transcribir. Sale la transcripción con marcas de tiempo, y se copia, se baja en `.SRT` o `.TXT`, o se aplica como subtítulos. Nada más en pantalla. |
+| **Transcribir** | "He visto un reel y quiero su texto" | Importar o pegar enlace + botón Transcribir. El vídeo o audio se **reproduce ahí mismo** con controles nativos, y la transcripción va resaltando la frase que suena; al pulsar una línea salta a ese momento. Se copia, se baja en `.SRT` o `.TXT`, o se aplica como subtítulos. |
 | **Viralizar** | Un vídeo ya montado (CapCut y similares) | Intensidad, zoom dramático con la voz, tambaleo, protección de subtítulos incrustados. No añade textos ni cortes. |
 | **Crear** | Fotos y clips sueltos | El editor completo: montaje automático, estilos rápidos, ritmo, tipografía, audio y score. Cada versión sale distinta. |
 | **Recortes** | Vídeo largo (podcast, directo, YouTube) | Duración del recorte y buscador de los mejores momentos, puntuados por voz, energía, dinámica y contexto del texto. |

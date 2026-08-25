@@ -143,6 +143,13 @@ function shell(): string {
         <div class="progress__track"><span class="progress__bar" id="asrBar"></span></div>
         <span class="progress__label" id="asrLabel"></span>
       </div>
+      <div class="trplayer" id="trPlayerBox" hidden>
+        <div class="trplayer__media" id="trPlayerMedia"></div>
+        <div class="trplayer__meta">
+          <span id="trPlayerName"></span>
+          <label class="toggle"><input type="checkbox" id="trFollow" checked /><span data-i18n="tr.follow"></span></label>
+        </div>
+      </div>
       <span class="empty-note" data-i18n="asr.hint"></span>
       <div id="transcript"></div>
       <div class="row" id="transcriptActions" hidden>
@@ -461,6 +468,7 @@ async function addFiles(files: File[]): Promise<void> {
   }
   renderStrip();
   renderBlocks();
+  renderTranscribePlayer();
   for (const a of added) {
     a.thumb = await thumbnail(a);
     for (const img of Array.from(document.querySelectorAll<HTMLImageElement>(`img[data-id="${a.id}"]`))) {
@@ -1010,19 +1018,26 @@ strip.addEventListener('click', (e) => {
   touch();
   renderStrip();
   renderBlocks();
+  renderTranscribePlayer();
 });
 
 $('clear').addEventListener('click', () => {
   for (const a of state.assets) URL.revokeObjectURL(a.url);
   state.assets = [];
   score = null;
+  cues = [];
   rebuild();
   renderStrip();
+  renderTranscript();
+  renderTranscribePlayer();
 });
 
 playBtn.addEventListener('click', () => {
   if (player.playing) player.pause();
-  else player.play();
+  else {
+    trMedia?.pause();
+    player.play();
+  }
   updateTransport();
 });
 
@@ -1216,6 +1231,76 @@ window.addEventListener('keydown', (e) => {
 
 
 
+
+/* ---------- transcribe player ---------- */
+
+let trMedia: HTMLMediaElement | null = null;
+let activeCue = -1;
+
+/** Source used by the transcribe section: the imported video, or the loaded audio track. */
+function transcribeSource(): { url: string; name: string; kind: 'video' | 'audio' } | null {
+  const video = state.assets.find((a) => a.kind === 'video');
+  if (video) return { url: video.url, name: video.name, kind: 'video' };
+  if (state.audio) return { url: state.audio.el.src, name: state.audio.name, kind: 'audio' };
+  return null;
+}
+
+/**
+ * Its own element, not the one the canvas renderer drives: here the media plays with sound and
+ * native controls, and the reel preview keeps its muted copy for rendering.
+ */
+function renderTranscribePlayer(): void {
+  const box = $('trPlayerBox');
+  const holder = $('trPlayerMedia');
+  const source = transcribeSource();
+
+  if (!source) {
+    if (trMedia) {
+      trMedia.pause();
+      trMedia.remove();
+      trMedia = null;
+    }
+    holder.innerHTML = '';
+    box.hidden = true;
+    return;
+  }
+
+  if (trMedia && trMedia.getAttribute('src') === source.url) {
+    $('trPlayerName').textContent = source.name;
+    box.hidden = false;
+    return;
+  }
+
+  trMedia?.pause();
+  holder.innerHTML = '';
+  const el = document.createElement(source.kind === 'video' ? 'video' : 'audio');
+  el.src = source.url;
+  el.controls = true;
+  el.preload = 'metadata';
+  if (el instanceof HTMLVideoElement) el.playsInline = true;
+  el.addEventListener('timeupdate', highlightCue);
+  el.addEventListener('seeked', highlightCue);
+  holder.appendChild(el);
+  trMedia = el;
+  $('trPlayerName').textContent = source.name;
+  box.hidden = false;
+}
+
+/** Follows the playhead through the transcript, the way a karaoke line would. */
+function highlightCue(): void {
+  if (!trMedia || !cues.length) return;
+  const time = trMedia.currentTime;
+  const index = cues.findIndex((c) => time >= c.start && time < c.end);
+  if (index === activeCue) return;
+  activeCue = index;
+
+  const items = Array.from(document.querySelectorAll<HTMLElement>('#transcript [data-cue]'));
+  items.forEach((item, i) => item.classList.toggle('is-active', i === index));
+  if (index >= 0 && $<HTMLInputElement>('trFollow').checked) {
+    items[index]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
 /* ---------- transcript panel ---------- */
 
 function stamp(seconds: number, srt = false): string {
@@ -1286,6 +1371,7 @@ async function loadFromLink(): Promise<void> {
       $('audioName').textContent = file.name;
       audioInRange.value = '0';
       renderAudio();
+      renderTranscribePlayer();
     } else {
       await addFiles([file]);
     }
@@ -1333,6 +1419,8 @@ async function runTranscription(): Promise<void> {
     cues = splitCues(found);
     scriptInput.value = found.map((c) => c.text).join(' ');
     renderTranscript();
+    activeCue = -1;
+    highlightCue();
     label.textContent = `${cues.length} ${t('asr.blocks')}`;
     if (!cues.length) toast(t('asr.empty'));
     else if (totalDuration(state.project) > 0.2) applyCues();
@@ -1509,6 +1597,8 @@ async function setSection(section: Section, remember = true): Promise<void> {
     if (location.hash.slice(1) !== section) history.replaceState(null, '', `#${section}`);
   }
   syncPreviewScale();
+  renderTranscribePlayer();
+  if (section !== 'transcribe') trMedia?.pause();
 
   if (section === 'boost') await setMode('viral');
   else if (section === 'multi') await setMode('multi');
@@ -1690,10 +1780,18 @@ $('transcript').addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-cue]');
   const cue = cues[Number(btn?.dataset.cue)];
   if (!cue) return;
-  const offset = state.project.clips[0]?.srcIn ?? 0;
-  player.pause();
-  player.seek(Math.max(0, cue.start - offset));
-  updateTransport();
+
+  if (trMedia) {
+    trMedia.currentTime = cue.start;
+    void trMedia.play().catch(() => undefined);
+  }
+  if (totalDuration(state.project) > 0.2) {
+    const offset = state.project.clips[0]?.srcIn ?? 0;
+    player.pause();
+    player.seek(Math.max(0, cue.start - offset));
+    updateTransport();
+  }
+  highlightCue();
 });
 
 $('copyText').addEventListener('click', () => {
@@ -1768,6 +1866,7 @@ renderAudio();
 rebuild();
 renderStrip();
 renderTranscript();
+renderTranscribePlayer();
 updateTransport();
 void setSection(firstSection, false);
 window.addEventListener('hashchange', () => {
