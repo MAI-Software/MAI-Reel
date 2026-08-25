@@ -10,11 +10,14 @@ import { recordCanvas, downloadBlob, extensionFor, pickMime } from './engine/exp
 import { analyzeMedia, type MediaStats } from './analysis/frames';
 import { scoreProject, type ScoreResult } from './analysis/score';
 import { FONTS, TEXT_STYLES, ensureFontsLoaded } from './data/typography';
-import { loadAudioFile, beatsInFragment, drawWaveform, analyzeFileAudio } from './engine/audio';
+import { loadAudioFile, beatsInFragment, drawWaveform, analyzeFileAudio, type SourceAudio } from './engine/audio';
+import { detectVoice, timeBlocksToSpeech, type VoiceMap } from './analysis/voice';
+import { findHighlights, type Highlight } from './analysis/highlights';
+import { randomSeed, seedCode } from './engine/rng';
 import { STYLE_PACKS, packById, autoDirect, formatReason, type Reason } from './engine/director';
 import { buildEntertainProject, idleEnhance } from './engine/autoedit';
 import { detectFocus } from './analysis/focus';
-import type { Aspect, Effect, Grade, ReelMode, TemplateId, TextAnim, TextOverlay, Transition } from './types';
+import type { Aspect, Effect, Enhance, Grade, MediaAsset, ReelMode, TemplateId, TextAnim, TextOverlay, Transition } from './types';
 
 const PARENT_SITE = 'https://mai-softwares.com';
 const REPO = 'https://github.com/MAI-Software/MAI-Reel';
@@ -66,6 +69,9 @@ function shell(): string {
     </a>
     <span class="topbar__tag" data-i18n="app.tagline"></span>
     <span class="topbar__spacer"></span>
+    <button class="chip chip--view" id="viewToggle" aria-pressed="false">
+      ${icons.layers}<span data-i18n="view.all"></span>
+    </button>
     <button class="chip chip--score" id="scoreChip" hidden>
       ${icons.target}<strong id="scoreChipVal">--</strong><small>/100</small>
     </button>
@@ -100,23 +106,43 @@ function shell(): string {
 
     <section class="panel panel--edit" aria-label="edit" id="panel-edit">
       <h2 class="panel__title" data-i18n="nav.edit"></h2>
-      <div class="segmented" id="modeSwitch" role="group">
-        <button type="button" data-mode="edit" aria-pressed="true" data-i18n="mode.edit"></button>
-        <button type="button" data-mode="entertain" aria-pressed="false" data-i18n="mode.entertain"></button>
+      <div class="segmented segmented--3" id="modeSwitch" role="group">
+        <button type="button" data-mode="viral" aria-pressed="false" data-i18n="mode.viral"></button>
+        <button type="button" data-mode="build" aria-pressed="true" data-i18n="mode.build"></button>
+        <button type="button" data-mode="multi" aria-pressed="false" data-i18n="mode.multi"></button>
       </div>
+      <p class="empty-note" id="modeHint" data-i18n="mode.build.hint"></p>
 
       <div class="entertain" id="entertainBox" hidden>
         <p class="empty-note" id="entertainInfo" data-i18n="entertain.hint"></p>
         <label class="block__range"><span data-i18n="entertain.intensity"></span> <output id="enIntensityVal">60%</output>
           <input type="range" id="enIntensity" min="10" max="100" step="5" value="60" />
         </label>
+        <label class="block__range"><span data-i18n="entertain.drama"></span> <output id="enDramaVal">60%</output>
+          <input type="range" id="enDrama" min="0" max="100" step="5" value="60" />
+        </label>
         <label class="toggle"><input type="checkbox" id="enShake" checked /><span data-i18n="entertain.shake"></span></label>
         <label class="toggle"><input type="checkbox" id="enFace" checked /><span data-i18n="entertain.face"></span></label>
         <label class="toggle"><input type="checkbox" id="enProtect" checked /><span data-i18n="entertain.protect"></span></label>
+        <button class="btn btn--sm" id="viralCaptions">${icons.captions}<span data-i18n="entertain.captions"></span></button>
+        <span class="empty-note" data-i18n="entertain.captionsHint"></span>
+      </div>
+
+      <div class="entertain" id="multiBox" hidden>
+        <p class="empty-note" id="multiInfo" data-i18n="multi.hint"></p>
+        <div class="chips" id="multiLen" role="group">
+          ${[15, 30, 45, 60].map((n) => `<button type="button" data-mlen="${n}">${n}s</button>`).join('')}
+        </div>
+        <button class="btn btn--primary" id="findClips">${icons.spark}<span data-i18n="multi.find"></span></button>
+        <div id="multiList"></div>
       </div>
 
       <div class="field" id="autoField">
         <button class="btn btn--primary" id="auto">${icons.spark}<span data-i18n="action.auto"></span></button>
+        <div class="row">
+          <button class="btn btn--sm" id="variant">${icons.wand}<span data-i18n="action.variant"></span></button>
+          <span class="empty-note" id="seedLabel"></span>
+        </div>
         <span class="empty-note" id="autoWhy" data-i18n="action.autoHint"></span>
       </div>
 
@@ -337,6 +363,11 @@ let analyzeTimer = 0;
 let lastPlaying: boolean | null = null;
 let lastStats: MediaStats | null = null;
 let lastReasons: Reason[] = [];
+let sourceAudio: SourceAudio | null = null;
+let voice: VoiceMap | null = null;
+let highlights: Highlight[] = [];
+let multiLength = 30;
+let focusPoint: { x: number; y: number } | null = null;
 
 /* ---------- i18n ---------- */
 
@@ -421,9 +452,10 @@ function currentBeats(): number[] | undefined {
   return beats.length > 3 ? beats : undefined;
 }
 
-function rebuild(): void {
+function rebuild(seed?: number): void {
   const aspect = aspectSel.value as Aspect;
   state.project = buildProject(state.assets, {
+    seed: seed ?? randomSeed(),
     beats: currentBeats(),
     template: templateSel.value as TemplateId,
     aspect,
@@ -440,6 +472,7 @@ function rebuild(): void {
   touch();
   renderScore();
   renderBlocks();
+  renderSeed();
 }
 
 function applyAspect(aspect: Aspect): void {
@@ -1194,6 +1227,10 @@ function applyPack(id: string): void {
   markPacks();
 }
 
+function renderSeed(): void {
+  $('seedLabel').textContent = state.project.seed ? `#${seedCode(state.project.seed)}` : '';
+}
+
 function renderReasons(): void {
   $('autoWhy').textContent = lastReasons.length
     ? lastReasons.map(formatReason).join(' · ')
@@ -1262,10 +1299,12 @@ async function autoEdit(): Promise<void> {
 function enhanceFromUI(): void {
   const en = state.project.enhance;
   en.intensity = Number($<HTMLInputElement>('enIntensity').value) / 100;
+  en.drama = Number($<HTMLInputElement>('enDrama').value) / 100;
   en.shake = $<HTMLInputElement>('enShake').checked;
   en.faceZoom = $<HTMLInputElement>('enFace').checked;
   en.protectCaptions = $<HTMLInputElement>('enProtect').checked;
   $('enIntensityVal').textContent = `${Math.round(en.intensity * 100)}%`;
+  $('enDramaVal').textContent = `${Math.round(en.drama * 100)}%`;
   player.seek(state.time);
 }
 
@@ -1274,9 +1313,11 @@ async function setMode(mode: ReelMode): Promise<void> {
   for (const btn of Array.from(document.querySelectorAll<HTMLElement>('[data-mode]'))) {
     btn.setAttribute('aria-pressed', String(btn.dataset.mode === mode));
   }
-  $('entertainBox').hidden = mode !== 'entertain';
+  $('entertainBox').hidden = mode !== 'viral';
+  $('multiBox').hidden = mode !== 'multi';
+  $('modeHint').textContent = t(`mode.${mode}.hint`);
 
-  if (mode === 'edit') {
+  if (mode === 'build') {
     state.project.enhance = idleEnhance();
     rebuild();
     return;
@@ -1285,42 +1326,172 @@ async function setMode(mode: ReelMode): Promise<void> {
   const video = state.assets.find((a) => a.kind === 'video');
   if (!video) {
     toast(t('entertain.needVideo'));
-    void setMode('edit');
+    void setMode('build');
     return;
   }
 
-  $('entertainInfo').textContent = t('entertain.analyzing');
+  await analyseSource(video, mode);
+  if (mode === 'viral') applyViral(video, 0, video.srcDuration || sourceAudio?.duration || 15);
+  else renderHighlights();
+}
+
+/** Decodes the video's own audio once: beats, loudness, voice activity and framing. */
+async function analyseSource(video: MediaAsset, mode: ReelMode): Promise<void> {
+  const info = mode === 'multi' ? $('multiInfo') : $('entertainInfo');
+  info.textContent = t('entertain.analyzing');
   player.pause();
   const [audio, focus] = await Promise.all([
     video.file ? analyzeFileAudio(video.file) : Promise.resolve(null),
     detectFocus(video),
   ]);
-  const enhance = {
+  sourceAudio = audio;
+  voice = audio ? detectVoice(audio) : null;
+  focusPoint = focus ? { x: focus.x, y: focus.y } : null;
+  info.textContent = [
+    audio?.bpm ? `${audio.bpm} BPM` : t('entertain.nobeat'),
+    voice ? `${voice.speech.length} ${t('voice.segments')} · ${Math.round(voice.coverage * 100)}%` : t('voice.none'),
+    focus ? t('entertain.face.found') : t('entertain.face.none'),
+  ].join(' · ');
+}
+
+/** Enhance payload rebuilt from the analysis, shifted to the clip's own timeline. */
+function enhanceFor(offset: number): Enhance {
+  const shift = (list: number[]) => list.map((v) => v - offset).filter((v) => v >= -0.5);
+  return {
     ...idleEnhance(),
     enabled: true,
     intensity: Number($<HTMLInputElement>('enIntensity').value) / 100,
+    drama: Number($<HTMLInputElement>('enDrama').value) / 100,
     shake: $<HTMLInputElement>('enShake').checked,
     faceZoom: $<HTMLInputElement>('enFace').checked,
     protectCaptions: $<HTMLInputElement>('enProtect').checked,
-    envelope: audio?.envelope ?? [],
-    hz: audio?.hz ?? 20,
-    beats: audio?.beats ?? [],
-    focus: focus ? { x: focus.x, y: focus.y } : null,
+    envelope: sourceAudio?.envelope ?? [],
+    hz: sourceAudio?.hz ?? 20,
+    beats: shift(sourceAudio?.beats ?? []),
+    accents: shift(voice?.accents ?? []),
+    speech: (voice?.speech ?? [])
+      .map((seg) => ({ start: seg.start - offset, end: seg.end - offset }))
+      .filter((seg) => seg.end > 0),
+    focus: focusPoint,
   };
+}
+
+/** Single-shot project used by both viral and multi modes. */
+function applyViral(video: MediaAsset, from: number, duration: number): void {
   state.project = buildEntertainProject(video, {
     aspect: aspectSel.value as Aspect,
-    duration: video.srcDuration || audio?.duration || 15,
-    enhance,
+    duration,
+    srcIn: from,
+    enhance: enhanceFor(from),
   });
   applyAspect(state.project.aspect);
   player.seek(0);
   touch();
   renderBlocks();
-  $('entertainInfo').textContent = [
-    audio?.bpm ? `${audio.bpm} BPM` : t('entertain.nobeat'),
-    focus ? t('entertain.face.found') : t('entertain.face.none'),
-    t('entertain.ready'),
-  ].join(' · ');
+  renderSeed();
+}
+
+function fmt(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const sec = Math.floor(seconds % 60);
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+function renderHighlights(): void {
+  const list = $('multiList');
+  if (!highlights.length) {
+    list.innerHTML = `<p class="empty-note">${t('multi.empty')}</p>`;
+    return;
+  }
+  list.innerHTML = highlights
+    .map(
+      (h, i) => `<button class="clipcard" data-clip-pick="${i}" aria-pressed="false">
+        <strong>${h.score}</strong>
+        <span>
+          <b>${fmt(h.start)} → ${fmt(h.end)}</b>
+          <small>${t('multi.speech')} ${Math.round(h.parts.speech * 100)}% · ${t('multi.energy')} ${Math.round(
+            h.parts.energy * 100,
+          )}% · ${t('multi.dynamics')} ${Math.round(h.parts.dynamics * 100)}%</small>
+        </span>
+      </button>`,
+    )
+    .join('');
+}
+
+async function findClips(): Promise<void> {
+  const video = state.assets.find((a) => a.kind === 'video');
+  if (!video) {
+    toast(t('entertain.needVideo'));
+    return;
+  }
+  if (!sourceAudio || !voice) await analyseSource(video, 'multi');
+  if (!sourceAudio || !voice) {
+    toast(t('voice.none'));
+    return;
+  }
+  highlights = findHighlights(sourceAudio, voice, { duration: multiLength, count: 5 });
+  renderHighlights();
+  toast(`${highlights.length} ${t('multi.found')}`);
+}
+
+/** Times the pasted script to the speech that was actually detected. */
+function viralCaptions(): void {
+  const script = scriptInput.value.trim();
+  if (!script) {
+    toast(t('entertain.captionsHint'));
+    return;
+  }
+  const blocks = script
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .reduce<string[]>((acc, word) => {
+      const last = acc[acc.length - 1];
+      if (last && `${last} ${word}`.length <= 34) acc[acc.length - 1] = `${last} ${word}`;
+      else acc.push(word);
+      return acc;
+    }, []);
+
+  const duration = totalDuration(state.project);
+  const offset = state.project.clips[0]?.srcIn ?? 0;
+  const spans = voice
+    ? timeBlocksToSpeech(
+        blocks,
+        {
+          ...voice,
+          speech: voice.speech
+            .map((seg) => ({ ...seg, start: seg.start - offset, end: seg.end - offset }))
+            .filter((seg) => seg.end > 0 && seg.start < duration),
+        },
+        0,
+        duration,
+      )
+    : blocks.map((_, i) => ({
+        start: (duration * i) / blocks.length,
+        end: (duration * (i + 1)) / blocks.length,
+        energy: 0,
+      }));
+
+  state.project.texts = state.project.texts.filter((x) => x.role !== 'caption');
+  blocks.forEach((text, i) => {
+    const span = spans[i];
+    if (!span) return;
+    state.project.texts.push({
+      id: uid('t'),
+      text,
+      start: Math.max(0, span.start),
+      end: Math.min(duration, Math.max(span.start + 0.7, span.end)),
+      role: 'caption',
+      y: 0.74,
+      size: 56,
+      fontId: fontSel.value,
+      styleId: styleSel.value,
+      anim: 'pop',
+    });
+  });
+  touch();
+  renderBlocks();
+  toast(`${blocks.length} ${t('toast.captions')}`);
 }
 
 $('packs').addEventListener('click', (e) => {
@@ -1332,15 +1503,58 @@ $('modeSwitch').addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-mode]');
   if (btn) void setMode(btn.dataset.mode as ReelMode);
 });
-for (const id of ['enIntensity', 'enShake', 'enFace', 'enProtect']) {
+for (const id of ['enIntensity', 'enDrama', 'enShake', 'enFace', 'enProtect']) {
   $(id).addEventListener('input', enhanceFromUI);
 }
+
+$('variant').addEventListener('click', () => {
+  rebuild();
+  void analyze();
+  toast(`#${seedCode(state.project.seed)}`);
+});
+$('viralCaptions').addEventListener('click', viralCaptions);
+$('findClips').addEventListener('click', () => void findClips());
+$('multiLen').addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-mlen]');
+  if (!btn) return;
+  multiLength = Number(btn.dataset.mlen);
+  for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-mlen]'))) {
+    b.setAttribute('aria-pressed', String(b === btn));
+  }
+});
+$('multiList').addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-clip-pick]');
+  if (!btn) return;
+  const h = highlights[Number(btn.dataset.clipPick)];
+  const video = state.assets.find((a) => a.kind === 'video');
+  if (!h || !video) return;
+  applyViral(video, h.start, h.end - h.start);
+  for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-clip-pick]'))) {
+    b.setAttribute('aria-pressed', String(b === btn));
+  }
+  toast(`${fmt(h.start)} → ${fmt(h.end)} · ${h.score}/100`);
+});
+
+$('viewToggle').addEventListener('click', () => {
+  const all = document.body.dataset.view !== 'all';
+  setView(all ? 'all' : 'tabs');
+});
+
+function setView(view: 'all' | 'tabs'): void {
+  document.body.dataset.view = view;
+  $('viewToggle').setAttribute('aria-pressed', String(view === 'all'));
+  localStorage.setItem('mai-reel-view', view);
+  syncPreviewScale();
+}
+
 
 /* ---------- boot ---------- */
 
 const initialTab = (location.hash.slice(1) as Tab) || 'media';
 setTab(TABS.includes(initialTab) ? initialTab : 'media', false);
-document.body.dataset.mode = 'edit';
+document.body.dataset.mode = 'build';
+setView((localStorage.getItem('mai-reel-view') as 'all' | 'tabs') === 'all' ? 'all' : 'tabs');
+renderSeed();
 // the picker has to show the language that was restored from storage or the browser
 $<HTMLSelectElement>('lang').value = state.lang;
 // on a wide screen there is room for everything, so these groups start open

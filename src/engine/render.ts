@@ -114,13 +114,23 @@ export function enhanceMotion(en: Enhance, t: number): Motion {
     if (d >= -0.05 && d < 0.55) pulse = Math.max(pulse, Math.exp(-Math.max(0, d) * 7));
   }
 
-  const zoomCap = en.protectCaptions ? 0.06 : 0.16;
-  const zoom = 1 + k * Math.min(zoomCap, 0.02 + 0.035 * energy + 0.07 * pulse);
+  // voice accents get a slower, deeper push-in than a musical beat: that is the dramatic zoom
+  let drama = 0;
+  for (const a of en.accents ?? []) {
+    const d = t - a;
+    if (d < -0.05) break;
+    if (d >= -0.05 && d < 1.6) drama = Math.max(drama, Math.exp(-Math.max(0, d) * 1.6));
+  }
+  const talking = (en.speech ?? []).some((s) => t >= s.start - 0.05 && t <= s.end + 0.2);
+  const dramaK = drama * (en.drama ?? 0.6) * (talking ? 1 : 0.45);
+
+  const zoomCap = en.protectCaptions ? 0.07 : 0.2;
+  const zoom = 1 + k * Math.min(zoomCap, 0.02 + 0.035 * energy + 0.07 * pulse + 0.11 * dramaK);
 
   let panX = 0;
   let panY = 0;
   if (en.faceZoom && en.focus) {
-    const pull = k * (0.35 + 0.4 * pulse);
+    const pull = k * (0.35 + 0.4 * pulse + 0.5 * dramaK);
     panX = -(en.focus.x - 0.5) * 2 * pull;
     panY = (0.5 - en.focus.y) * 2 * pull;
   }

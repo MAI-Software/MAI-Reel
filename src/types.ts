@@ -35,7 +35,7 @@ export type TextAnim = 'none' | 'fade' | 'pop' | 'slide-up' | 'typewriter' | 'ka
 /** Colour look applied to a clip. */
 export type Grade = 'none' | 'vivid' | 'warm' | 'cool' | 'mono' | 'film' | 'vhs' | 'dream' | 'night';
 
-export type ReelMode = 'edit' | 'entertain';
+export type ReelMode = 'viral' | 'build' | 'multi';
 export type TemplateId = 'punch' | 'flow' | 'story';
 export type Aspect = '9:16' | '4:5' | '1:1';
 export type TextRole = 'hook' | 'caption' | 'cta';
@@ -74,6 +74,12 @@ export interface Enhance {
   hz: number;
   /** Beat times in seconds, used for the punch-ins. */
   beats: number[];
+  /** Voice accents: loud attacks that deserve a dramatic push-in. */
+  accents: number[];
+  /** Stretches where somebody is speaking, for the dramatic face zoom. */
+  speech: Array<{ start: number; end: number }>;
+  /** Strength of the dramatic zoom on speech, 0..1 */
+  drama: number;
   /** Point of interest to push into, 0..1 of the frame. */
   focus: { x: number; y: number } | null;
   /** Keeps burned-in captions inside the frame while zooming. */
@@ -86,6 +92,8 @@ export interface Project {
   aspect: Aspect;
   fps: number;
   mode: ReelMode;
+  /** Seed of the variation that produced this edit. */
+  seed: number;
   template: TemplateId;
   clips: Clip[];
   texts: TextOverlay[];

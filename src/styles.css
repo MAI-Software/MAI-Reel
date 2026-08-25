@@ -1175,19 +1175,26 @@ body[data-scrolled='true'] .topbar {
   background: var(--surface-2);
 }
 
-/* entertainment mode never writes on top of the footage, so those controls step aside */
-body[data-mode='entertain'] #packField,
-body[data-mode='entertain'] #autoField,
-body[data-mode='entertain'] .panel--edit .disclosure,
-body[data-mode='entertain'] .panel--edit .grid-2:nth-of-type(n + 2),
-body[data-mode='entertain'] #rebuild,
-body[data-mode='entertain'] .panel--edit > .field:not(#entertainField) {
+/* boost and multi never write on top of the footage, so the builder controls step aside
+   (the caption group stays: those modes do add subtitles) */
+body[data-mode='viral'] #packField,
+body[data-mode='multi'] #packField,
+body[data-mode='viral'] #autoField,
+body[data-mode='multi'] #autoField,
+body[data-mode='viral'] #settingsGroup,
+body[data-mode='multi'] #settingsGroup,
+body[data-mode='viral'] #textsGroup,
+body[data-mode='multi'] #textsGroup,
+body[data-mode='viral'] #audioGroup,
+body[data-mode='multi'] #audioGroup,
+body[data-mode='viral'] #rebuild,
+body[data-mode='multi'] #rebuild,
+body[data-mode='viral'] .panel--edit > .empty-note:last-child,
+body[data-mode='multi'] .panel--edit > .empty-note:last-child {
   display: none;
 }
 
-body[data-mode='entertain'] .panel--blocks {
-  display: none;
-}
+
 
 /* ---------- disclosure groups ---------- */
 
@@ -1617,6 +1624,133 @@ body[data-tab='score'] .panel--score {
   }
 
   .chip--score small {
+    display: none;
+  }
+}
+
+/* ---------- modes, clip finder, one-screen view ---------- */
+
+.segmented--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.segmented button {
+  padding: 0 4px;
+}
+
+.chip--view[aria-pressed='true'] {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.clipcard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg);
+  text-align: left;
+}
+
+.clipcard[aria-pressed='true'] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px rgba(236, 72, 153, 0.35);
+}
+
+.clipcard strong {
+  min-width: 40px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary);
+}
+
+.clipcard span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.clipcard small {
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+
+#multiList {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* one-screen view: no tabs, everything stacked, the page scrolls */
+body[data-view='all'] .tabbar {
+  display: none;
+}
+
+body[data-view='all'] .panel {
+  display: flex !important;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+body[data-view='all'] .panel--blocks #blocks,
+body[data-view='all'] .panel--score #scoreBody,
+body[data-view='all'] #multiList {
+  max-height: none;
+  overflow: visible;
+}
+
+body[data-view='all'] .col {
+  overflow: visible;
+}
+
+@media (max-width: 1023px) {
+  body[data-view='all'] {
+    overflow: auto;
+    height: auto;
+  }
+
+  body[data-view='all'] #app {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  body[data-view='all'] .layout {
+    display: flex;
+    flex-direction: column;
+  }
+
+  body[data-view='all'] .stage {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--bg);
+    padding-bottom: 8px;
+  }
+
+  body[data-view='all'] .viewport,
+  body[data-view='all'][data-tab='edit'] .viewport,
+  body[data-view='all'][data-tab='blocks'] .viewport {
+    height: min(30dvh, 300px);
+  }
+
+  body[data-view='all'] .footer {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  body[data-view='all'] .footer__note,
+  body[data-view='all'] .footer__links {
+    display: flex;
+  }
+
+  body[data-view='all'] .parent-link {
     display: none;
   }
 }

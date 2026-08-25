@@ -1,6 +1,7 @@
 import type { Aspect, Clip, Effect, Enhance, MediaAsset, Project, TemplateId, TextAnim, TextOverlay, Transition } from '../types';
 import { uid } from '../state';
 import { DEFAULT_FONT, DEFAULT_STYLE } from '../data/typography';
+import { makeRng, randomSeed, pick, jitter, type Rng } from './rng';
 
 export interface TemplateSpec {
   id: TemplateId;
@@ -44,6 +45,18 @@ export const TEMPLATES: Record<TemplateId, TemplateSpec> = {
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
+/** Effects and transitions are drawn from the template pool, never in a fixed rotation. */
+function rollEffect(rng: Rng, spec: TemplateSpec, isVideo: boolean): Effect {
+  if (isVideo) return rng() < 0.55 ? 'none' : 'zoom-in';
+  return pick(rng, spec.effects);
+}
+
+function rollTransition(rng: Rng, spec: TemplateSpec, index: number): Transition {
+  if (index === 0) return 'cut';
+  // a hard cut now and then keeps a run of transitions from feeling mechanical
+  return rng() < 0.25 ? 'cut' : pick(rng, spec.transitions);
+}
+
 export interface BuildOptions {
   template: TemplateId;
   aspect: Aspect;
@@ -59,11 +72,15 @@ export interface BuildOptions {
   /** Optional script: split into timed caption blocks over the whole reel. */
   script?: string;
   enhance?: Enhance;
+  /** Variation seed: the same seed rebuilds the same edit, a new one varies it. */
+  seed?: number;
 }
 
 /** Builds a full timeline from the imported assets: durations, effects, transitions and text. */
 export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project {
   const spec = TEMPLATES[opts.template];
+  const seed = opts.seed ?? randomSeed();
+  const rng = makeRng(seed);
   const target = opts.target ?? spec.target;
   // With few stills the timeline would fall short of the target, so `flow`/`story` stretch each
   // shot (up to 2x the template cap) and `punch` keeps its cadence and cycles the assets instead.
@@ -84,8 +101,8 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
         start: cursor,
         duration: asset.kind === 'video' ? Math.min(duration, asset.srcDuration || duration) : duration,
         srcIn: 0,
-        effect: asset.kind === 'video' ? 'none' : spec.effects[i % spec.effects.length]!,
-        transition: i === 0 ? 'cut' : spec.transitions[i % spec.transitions.length]!,
+        effect: rollEffect(rng, spec, asset.kind === 'video'),
+        transition: rollTransition(rng, spec, i),
         grade: 'none',
       });
       cursor += clips[clips.length - 1]!.duration;
@@ -97,15 +114,15 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
     const duration =
       asset.kind === 'video'
         ? clamp(asset.srcDuration || spec.maxVideoClip, spec.minClip, assets.length === 1 ? Math.max(target, spec.maxVideoClip) : spec.maxVideoClip)
-        : perImage;
+        : clamp(jitter(rng, perImage, 0.18), spec.minClip * 0.8, cap * 1.25);
     clips.push({
       id: uid('c'),
       assetId: asset.id,
       start: cursor,
       duration,
       srcIn: 0,
-      effect: asset.kind === 'video' ? 'none' : spec.effects[i % spec.effects.length]!,
-      transition: i === 0 ? 'cut' : spec.transitions[i % spec.transitions.length]!,
+      effect: rollEffect(rng, spec, asset.kind === 'video'),
+      transition: rollTransition(rng, spec, i),
       grade: 'none',
     });
     cursor += duration;
@@ -116,7 +133,7 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
     let i = clips.length;
     while (cursor < target - 0.2 && i < 120) {
       const asset = stills[i % stills.length]!;
-      const duration = Math.min(perImage, target - cursor);
+      const duration = Math.min(clamp(jitter(rng, perImage, 0.2), spec.minClip * 0.8, cap), target - cursor);
       if (duration < spec.minClip * 0.6) break;
       clips.push({
         id: uid('c'),
@@ -124,8 +141,8 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
         start: cursor,
         duration,
         srcIn: 0,
-        effect: spec.effects[i % spec.effects.length]!,
-        transition: spec.transitions[i % spec.transitions.length]!,
+        effect: rollEffect(rng, spec, false),
+        transition: rollTransition(rng, spec, i),
         grade: 'none',
       });
       cursor += duration;
@@ -174,7 +191,8 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
   return {
     aspect: opts.aspect,
     fps: 30,
-    mode: 'edit',
+    mode: 'build',
+    seed,
     template: opts.template,
     clips,
     texts,
@@ -191,6 +209,9 @@ export function idleEnhance(): Enhance {
     envelope: [],
     hz: 20,
     beats: [],
+    accents: [],
+    speech: [],
+    drama: 0.6,
     focus: null,
     protectCaptions: true,
     shake: true,
@@ -202,6 +223,8 @@ export interface EntertainOptions {
   aspect: Aspect;
   duration: number;
   enhance: Enhance;
+  /** Where the clip starts inside the source video (multi mode trims a long video). */
+  srcIn?: number;
 }
 
 /**
@@ -212,7 +235,8 @@ export function buildEntertainProject(asset: MediaAsset, opts: EntertainOptions)
   return {
     aspect: opts.aspect,
     fps: 30,
-    mode: 'entertain',
+    mode: 'viral',
+    seed: randomSeed(),
     template: 'flow',
     clips: [
       {
@@ -220,7 +244,7 @@ export function buildEntertainProject(asset: MediaAsset, opts: EntertainOptions)
         assetId: asset.id,
         start: 0,
         duration: Math.max(1, opts.duration),
-        srcIn: 0,
+        srcIn: opts.srcIn ?? 0,
         effect: 'none',
         transition: 'cut',
         grade: 'none',

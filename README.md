@@ -4,6 +4,22 @@ Editor web de reels rápido y automático, optimizado para móvil y escritorio. 
 
 Todo el procesamiento ocurre en el navegador: ningún archivo se sube a ningún servidor.
 
+## Tres modos
+
+| Modo | Para qué | Qué hace |
+|---|---|---|
+| **Viralizar** | Un vídeo ya montado (CapCut y similares) | Decodifica su audio, detecta voz, golpes y sujeto, y añade movimiento de cámara, tambaleo al ritmo y **zoom dramático sobre la voz**. Los subtítulos que pegues se colocan sobre las frases habladas, no sobre los silencios. Nunca tapa lo que ya trae el vídeo. |
+| **Construcción** | Fotos y clips sueltos | El editor completo: plantillas, efectos, transiciones, colores, textos y score. **Cada versión sale distinta** — botón `Otra versión`. |
+| **Multi** | Un vídeo largo (podcast, directo, YouTube) | Analiza toda la pista, puntúa ventanas de 15/30/45/60 s por densidad de voz, energía y contraste dinámico, ajusta los cortes a los silencios y propone los mejores momentos para recortar. |
+
+## Variación
+
+El montaje ya no es determinista. Cada generación usa una semilla: efectos, transiciones, duraciones de plano y look salen de un sorteo acotado por las mediciones, y la semilla se muestra (`#A3F2K`) para poder distinguir versiones. `Otra versión` tira una semilla nueva; el director automático prueba además dos packs de estilo al azar cada vez.
+
+## Vista
+
+Pestañas (una sección a la vez, sin scroll de página) o **Todo en una pantalla** desde el botón de la cabecera: los cuatro paneles apilados con la previsualización fija arriba. La elección se guarda.
+
 ## Qué hace
 
 - **Importación**: imágenes (JPG/PNG/WebP) y vídeo (MP4/MOV/WebM) por selector o arrastrando.
