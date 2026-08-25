@@ -101,7 +101,17 @@ Medido con un clip de 11 s: detección de 4 frases y transcripción correcta en 
 
 Caja **“Pegar enlace de un vídeo”** en el panel de Material. Acepta enlaces **directos** a un archivo (`.mp4`, `.mov`, `.webm`, `.mp3`, `.wav`…) servidos con CORS abierto; muestra el progreso de descarga y, si el enlace es audio, lo carga como pista musical y como fuente de transcripción.
 
-Los enlaces de **YouTube, TikTok, Instagram, Facebook, X, Vimeo, Twitch o Drive no funcionan** y la app lo dice con un mensaje explícito en vez de fallar en silencio: esas páginas no son el archivo de vídeo y ningún navegador puede descargarlas por CORS y por sus términos de uso. Descarga el vídeo y súbelo como archivo.
+### Enlaces de YouTube, Instagram, TikTok, Vimeo, Twitch y Facebook
+
+Se **incrustan y se reproducen dentro de la app** con el reproductor oficial de cada plataforma (Shorts, Reels y TikToks se muestran en vertical).
+
+Lo que **no** se puede hacer desde un navegador es descargar su archivo: el vídeo vive en un dominio con CORS cerrado y sus términos lo prohíben. Como el reproductor va en un iframe de otro origen, tampoco se puede leer su audio con Web Audio.
+
+Por eso para transcribir un enlace de plataforma la app usa **captura del audio de la pestaña**: le das al play en el reproductor incrustado, pulsas *Capturar audio y transcribir*, eliges “Esta pestaña” y marcas “Compartir audio”. Lo que suene se graba y se transcribe con Whisper en local.
+
+- Requiere **Chrome o Edge de escritorio**: Firefox y Safari no comparten audio de pestaña, y en móvil no existe. La app oculta el botón y lo explica cuando no está disponible.
+- Los tiempos de la transcripción son relativos al inicio de la grabación, no al minuto del vídeo original.
+- Alternativa siempre válida: descargar el vídeo y subirlo como archivo.
 
 ## PWA e app Android (APK)
 

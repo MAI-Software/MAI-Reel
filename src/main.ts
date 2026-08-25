@@ -16,6 +16,8 @@ import { findHighlights, type Highlight } from './analysis/highlights';
 import { randomSeed, seedCode } from './engine/rng';
 import { transcribeFile, splitCues, isTranscriptionSupported, type Cue } from './analysis/transcribe';
 import { fetchMediaFromUrl, LinkError, platformOf } from './engine/fetchMedia';
+import { embedFor, type EmbedInfo } from './engine/embed';
+import { captureTabAudio, isCaptureSupported, CaptureError, type Capture } from './engine/capture';
 import { STYLE_PACKS, packById, autoDirect, formatReason, type Reason } from './engine/director';
 import { buildEntertainProject, idleEnhance } from './engine/autoedit';
 import { detectFocus } from './analysis/focus';
@@ -148,6 +150,14 @@ function shell(): string {
         <div class="trplayer__meta">
           <span id="trPlayerName"></span>
           <label class="toggle"><input type="checkbox" id="trFollow" checked /><span data-i18n="tr.follow"></span></label>
+        </div>
+        <div class="capture" id="captureBox" hidden>
+          <p class="empty-note" data-i18n="cap.hint"></p>
+          <div class="row">
+            <button class="btn btn--accent" id="captureStart">${icons.captions}<span data-i18n="cap.start"></span></button>
+            <button class="btn btn--primary" id="captureStop" hidden>${icons.close}<span data-i18n="cap.stop"></span></button>
+          </div>
+          <span class="empty-note" id="captureStatus"></span>
         </div>
       </div>
       <span class="empty-note" data-i18n="asr.hint"></span>
@@ -459,6 +469,7 @@ async function addFiles(files: File[]): Promise<void> {
   if (!added.length) return;
 
   const hadClips = state.project.clips.length > 0;
+  capturedAudio = null;
   state.assets.push(...added);
   if (hadClips) {
     appendAssets(state.project, added);
@@ -1026,6 +1037,8 @@ $('clear').addEventListener('click', () => {
   state.assets = [];
   score = null;
   cues = [];
+  capturedAudio = null;
+  clearEmbed();
   rebuild();
   renderStrip();
   renderTranscript();
@@ -1232,10 +1245,74 @@ window.addEventListener('keydown', (e) => {
 
 
 
+
+/* ---------- platform embeds and tab-audio capture ---------- */
+
+let embed: EmbedInfo | null = null;
+let capture: Capture | null = null;
+let captureTimer = 0;
+
+/** Mounts the official embed of a platform link so it can at least be watched here. */
+function showEmbed(info: EmbedInfo, url: string): void {
+  embed = info;
+  trMedia?.pause();
+  trMedia = null;
+  const holder = $('trPlayerMedia');
+  holder.innerHTML = `<iframe class="embed ${info.vertical ? 'embed--vertical' : ''}" src="${info.src}"
+    title="${info.platform}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture"
+    allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+  $('trPlayerName').textContent = url;
+  $('trPlayerBox').hidden = false;
+  $('captureBox').hidden = !isCaptureSupported();
+  $('captureStatus').textContent = isCaptureSupported() ? '' : t('cap.unsupported');
+  activeCue = -1;
+}
+
+function clearEmbed(): void {
+  embed = null;
+  $('captureBox').hidden = true;
+}
+
+/** Records what this tab is playing and sends that audio to Whisper. */
+async function startCapture(): Promise<void> {
+  try {
+    capture = await captureTabAudio();
+  } catch (err) {
+    const reason = err instanceof CaptureError ? err.reason : 'denied';
+    $('captureStatus').textContent = t(`cap.error.${reason}`);
+    return;
+  }
+  $('captureStart').hidden = true;
+  $('captureStop').hidden = false;
+  captureTimer = window.setInterval(() => {
+    $('captureStatus').textContent = `${t('cap.recording')} ${capture ? capture.elapsed().toFixed(0) : 0}s`;
+  }, 500);
+  $('captureStatus').textContent = t('cap.recording');
+}
+
+async function stopCapture(): Promise<void> {
+  if (!capture) return;
+  clearInterval(captureTimer);
+  const blob = await capture.stop();
+  capture = null;
+  $('captureStart').hidden = false;
+  $('captureStop').hidden = true;
+
+  if (blob.size < 2000) {
+    $('captureStatus').textContent = t('cap.error.noaudio');
+    return;
+  }
+  $('captureStatus').textContent = `${(blob.size / 1048576).toFixed(1)} MB · ${t('asr.running')}`;
+  capturedAudio = new File([blob], 'captura.webm', { type: blob.type });
+  await runTranscription();
+  $('captureStatus').textContent = '';
+}
+
 /* ---------- transcribe player ---------- */
 
 let trMedia: HTMLMediaElement | null = null;
 let activeCue = -1;
+let capturedAudio: File | null = null;
 
 /** Source used by the transcribe section: the imported video, or the loaded audio track. */
 function transcribeSource(): { url: string; name: string; kind: 'video' | 'audio' } | null {
@@ -1253,6 +1330,8 @@ function renderTranscribePlayer(): void {
   const box = $('trPlayerBox');
   const holder = $('trPlayerMedia');
   const source = transcribeSource();
+  if (source && embed) clearEmbed();
+  if (!source && embed) return; // the embed owns the box until the user imports a file
 
   if (!source) {
     if (trMedia) {
@@ -1347,6 +1426,13 @@ async function loadFromLink(): Promise<void> {
   const url = input.value.trim();
   if (!url) return;
 
+  const info = embedFor(url);
+  if (info) {
+    showEmbed(info, url);
+    status.textContent = tf('link.embedded', { host: info.platform });
+    return;
+  }
+
   const platform = platformOf(url);
   if (platform) {
     status.textContent = tf('link.platform', { host: platform });
@@ -1388,6 +1474,7 @@ async function loadFromLink(): Promise<void> {
 /** Runs Whisper on the imported video and turns the transcript into caption blocks. */
 async function runTranscription(): Promise<void> {
   const source =
+    capturedAudio ??
     state.assets.find((a) => a.kind === 'video' && a.file)?.file ??
     state.audioFile ??
     state.assets.find((a) => a.file)?.file;
@@ -1812,6 +1899,8 @@ $('variant').addEventListener('click', () => {
   toast(`#${seedCode(state.project.seed)}`);
 });
 $('viralCaptions').addEventListener('click', viralCaptions);
+$('captureStart').addEventListener('click', () => void startCapture());
+$('captureStop').addEventListener('click', () => void stopCapture());
 $('linkLoad').addEventListener('click', () => void loadFromLink());
 $<HTMLInputElement>('linkUrl').addEventListener('keydown', (e) => {
   if ((e as KeyboardEvent).key === 'Enter') void loadFromLink();
