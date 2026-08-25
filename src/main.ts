@@ -18,6 +18,15 @@ import { transcribeFile, splitCues, isTranscriptionSupported, type Cue } from '.
 import { fetchMediaFromUrl, LinkError, platformOf } from './engine/fetchMedia';
 import { embedFor, type EmbedInfo } from './engine/embed';
 import { captureTabAudio, isCaptureSupported, CaptureError, type Capture } from './engine/capture';
+import {
+  extractorUrl,
+  setExtractorUrl,
+  hasExtractor,
+  checkExtractor,
+  fetchLinkTranscript,
+  fetchLinkAudio,
+  ExtractorError,
+} from './engine/extractor';
 import { STYLE_PACKS, packById, autoDirect, formatReason, type Reason } from './engine/director';
 import { buildEntertainProject, idleEnhance } from './engine/autoedit';
 import { detectFocus } from './analysis/focus';
@@ -151,6 +160,10 @@ function shell(): string {
           <span id="trPlayerName"></span>
           <label class="toggle"><input type="checkbox" id="trFollow" checked /><span data-i18n="tr.follow"></span></label>
         </div>
+        <div class="linkjob" id="linkJobBox" hidden>
+          <button class="btn btn--primary" id="linkTranscribe">${icons.captions}<span data-i18n="ext.run"></span></button>
+          <span class="empty-note" id="linkJobStatus"></span>
+        </div>
         <div class="capture" id="captureBox" hidden>
           <p class="empty-note" data-i18n="cap.hint"></p>
           <div class="row">
@@ -168,6 +181,18 @@ function shell(): string {
         <button class="btn btn--sm" id="downloadTxt">${icons.download}<span>.TXT</span></button>
         <button class="btn btn--sm btn--primary" id="applyCues">${icons.spark}<span data-i18n="asr.apply"></span></button>
       </div>
+      <details class="disclosure" id="serverGroup">
+        <summary>${icons.sliders}<span data-i18n="ext.label"></span></summary>
+        <div class="field">
+          <span class="empty-note" data-i18n="ext.hint"></span>
+          <div class="linkbox__row">
+            <input type="url" id="extractorUrl" inputmode="url" autocomplete="off" placeholder="https://…" />
+            <button class="btn" id="extractorSave">${icons.spark}<span data-i18n="ext.save"></span></button>
+          </div>
+          <span class="empty-note" id="extractorStatus"></span>
+        </div>
+      </details>
+
       <details class="disclosure" id="manualGroup">
         <summary>${icons.sliders}<span data-i18n="tr.manual"></span></summary>
         <div class="field">
@@ -1246,6 +1271,75 @@ window.addEventListener('keydown', (e) => {
 
 
 
+
+/* ---------- extractor service: paste a link, get the transcript ---------- */
+
+let pendingLink = '';
+
+function refreshLinkJob(): void {
+  const show = Boolean(pendingLink) && hasExtractor();
+  $('linkJobBox').hidden = !show;
+  // with a server the tab capture is only the fallback, so it steps aside
+  $('captureBox').hidden = !pendingLink || show || !isCaptureSupported();
+}
+
+/** One button: subtitles from the platform when they exist, audio + Whisper when they do not. */
+async function transcribeLink(): Promise<void> {
+  if (!pendingLink) return;
+  const button = $<HTMLButtonElement>('linkTranscribe');
+  const status = $('linkJobStatus');
+  button.disabled = true;
+  status.textContent = t('ext.working');
+
+  try {
+    const result = await fetchLinkTranscript(pendingLink, $<HTMLSelectElement>('asrLang').value);
+    cues = splitCues(result.cues);
+    scriptInput.value = result.cues.map((c) => c.text).join(' ');
+    renderTranscript();
+    activeCue = -1;
+    highlightCue();
+    status.textContent = `${result.title ?? ''} · ${cues.length} ${t('asr.blocks')}`.trim();
+    if (totalDuration(state.project) > 0.2) applyCues();
+    return;
+  } catch (err) {
+    const reason = err instanceof ExtractorError ? err.reason : 'extractor';
+    if (reason !== 'nocaptions') {
+      status.textContent = t(`ext.error.${reason}`);
+      button.disabled = false;
+      return;
+    }
+    status.textContent = t('ext.noCaptions');
+  }
+
+  // no subtitles on the platform: pull the audio and run Whisper here
+  try {
+    status.textContent = t('ext.downloading');
+    capturedAudio = await fetchLinkAudio(pendingLink);
+    status.textContent = `${(capturedAudio.size / 1048576).toFixed(1)} MB · ${t('asr.running')}`;
+    await runTranscription();
+    status.textContent = '';
+  } catch (err) {
+    const reason = err instanceof ExtractorError ? err.reason : 'extractor';
+    status.textContent = t(`ext.error.${reason}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function saveExtractor(): Promise<void> {
+  const input = $<HTMLInputElement>('extractorUrl');
+  const status = $('extractorStatus');
+  status.textContent = t('ext.checking');
+  const health = await checkExtractor(input.value);
+  if (!health.ok) {
+    status.textContent = t('ext.error.network');
+    return;
+  }
+  setExtractorUrl(input.value);
+  status.textContent = `${t('ext.ready')} · yt-dlp ${health.ytdlp ?? ''}`.trim();
+  refreshLinkJob();
+}
+
 /* ---------- platform embeds and tab-audio capture ---------- */
 
 let embed: EmbedInfo | null = null;
@@ -1263,14 +1357,15 @@ function showEmbed(info: EmbedInfo, url: string): void {
     allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
   $('trPlayerName').textContent = url;
   $('trPlayerBox').hidden = false;
-  $('captureBox').hidden = !isCaptureSupported();
   $('captureStatus').textContent = isCaptureSupported() ? '' : t('cap.unsupported');
   activeCue = -1;
 }
 
 function clearEmbed(): void {
   embed = null;
+  pendingLink = '';
   $('captureBox').hidden = true;
+  $('linkJobBox').hidden = true;
 }
 
 /** Records what this tab is playing and sends that audio to Whisper. */
@@ -1428,8 +1523,12 @@ async function loadFromLink(): Promise<void> {
 
   const info = embedFor(url);
   if (info) {
+    pendingLink = url;
     showEmbed(info, url);
-    status.textContent = tf('link.embedded', { host: info.platform });
+    refreshLinkJob();
+    status.textContent = hasExtractor()
+      ? tf('link.ready', { host: info.platform })
+      : tf('link.embedded', { host: info.platform });
     return;
   }
 
@@ -1899,6 +1998,8 @@ $('variant').addEventListener('click', () => {
   toast(`#${seedCode(state.project.seed)}`);
 });
 $('viralCaptions').addEventListener('click', viralCaptions);
+$('linkTranscribe').addEventListener('click', () => void transcribeLink());
+$('extractorSave').addEventListener('click', () => void saveExtractor());
 $('captureStart').addEventListener('click', () => void startCapture());
 $('captureStop').addEventListener('click', () => void stopCapture());
 $('linkLoad').addEventListener('click', () => void loadFromLink());
@@ -1956,6 +2057,8 @@ rebuild();
 renderStrip();
 renderTranscript();
 renderTranscribePlayer();
+$<HTMLInputElement>('extractorUrl').value = extractorUrl();
+if (hasExtractor()) $('extractorStatus').textContent = t('ext.ready');
 updateTransport();
 void setSection(firstSection, false);
 window.addEventListener('hashchange', () => {

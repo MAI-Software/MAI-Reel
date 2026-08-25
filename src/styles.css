@@ -1600,6 +1600,16 @@ body[data-section='multi'] .panel--score {
   background: var(--surface);
 }
 
+.linkjob {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  background: rgba(236, 72, 153, 0.08);
+}
+
 /* ---------- responsive overrides (kept last so they win by order) ---------- */
 
 @media (max-width: 1023px) {

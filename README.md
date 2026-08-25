@@ -103,15 +103,17 @@ Caja **“Pegar enlace de un vídeo”** en el panel de Material. Acepta enlaces
 
 ### Enlaces de YouTube, Instagram, TikTok, Vimeo, Twitch y Facebook
 
-Se **incrustan y se reproducen dentro de la app** con el reproductor oficial de cada plataforma (Shorts, Reels y TikToks se muestran en vertical).
+Se **incrustan y se reproducen dentro de la app** con el reproductor oficial de cada plataforma (Shorts, Reels y TikToks salen en vertical).
 
-Lo que **no** se puede hacer desde un navegador es descargar su archivo: el vídeo vive en un dominio con CORS cerrado y sus términos lo prohíben. Como el reproductor va en un iframe de otro origen, tampoco se puede leer su audio con Web Audio.
+Para **transcribirlos hay dos caminos**:
 
-Por eso para transcribir un enlace de plataforma la app usa **captura del audio de la pestaña**: le das al play en el reproductor incrustado, pulsas *Capturar audio y transcribir*, eliges “Esta pestaña” y marcas “Compartir audio”. Lo que suene se graba y se transcribe con Whisper en local.
+**1. Con el servidor de extracción (recomendado, es lo que hace la competencia).** Pegas el enlace y pulsas *Transcribir este enlace*: el servidor trae los subtítulos que la propia plataforma ya tiene —instantáneo y con los tiempos exactos— y si el vídeo no los tiene, descarga su audio y Whisper lo transcribe en tu navegador. El servidor está en [`server/`](server/): son ~250 líneas de Python sobre `yt-dlp`, se despliega en Fly.io o cualquier Docker, y se configura una vez en *Transcribir → Servidor de extracción*.
 
-- Requiere **Chrome o Edge de escritorio**: Firefox y Safari no comparten audio de pestaña, y en móvil no existe. La app oculta el botón y lo explica cuando no está disponible.
-- Los tiempos de la transcripción son relativos al inicio de la grabación, no al minuto del vídeo original.
-- Alternativa siempre válida: descargar el vídeo y subirlo como archivo.
+Probado end-to-end: enlace de YouTube → **75 bloques con marcas de tiempo y el título del vídeo**, en el idioma seleccionado.
+
+**2. Sin servidor: captura del audio de la pestaña.** Le das al play en el reproductor incrustado, pulsas *Capturar audio y transcribir*, eliges "Esta pestaña" y marcas "Compartir audio". Solo en Chrome/Edge de escritorio.
+
+Por qué hace falta un servidor para la vía 1: el navegador no puede descargar el archivo (esos dominios no dan CORS) y el reproductor va en un iframe de otro origen, así que tampoco se puede leer su audio. Lo comprobé también contra los endpoints públicos: la lista de subtítulos de YouTube se obtiene, pero el endpoint que devuelve el texto responde vacío sin un token de sesión; TikTok bloquea por IP y la página de Instagram ya no trae la URL del vídeo. `yt-dlp` es lo que resuelve todo eso, y por eso el servicio lo usa.
 
 ## PWA e app Android (APK)
 
