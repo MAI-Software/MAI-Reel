@@ -111,7 +111,21 @@ Para **transcribirlos hay dos caminos**:
 
 Probado end-to-end: enlace de YouTube → **75 bloques con marcas de tiempo y el título del vídeo**, en el idioma seleccionado.
 
-**2. Sin servidor: captura del audio de la pestaña.** Le das al play en el reproductor incrustado, pulsas *Capturar audio y transcribir*, eliges "Esta pestaña" y marcas "Compartir audio". Solo en Chrome/Edge de escritorio.
+**2. Sin servidor: captura del audio de la pestaña.** Un botón. Eliges "Esta pestaña" y marcas "Compartir audio", y la app hace el resto: pone el vídeo desde el principio (controla el reproductor de YouTube por `postMessage`), muestra el progreso `0:12 / 3:34` y **para y transcribe sola cuando el vídeo termina**. Va en tiempo real, así que un reel de 30 s tarda 30 s. Solo en Chrome/Edge de escritorio; en Firefox, Safari y móvil no existe la API.
+
+### ¿Y sin nada de esto? ¿No vale un Worker de Cloudflare?
+
+Comprobado, no por suposición:
+
+| Vía | Resultado |
+|---|---|
+| Navegador → página de YouTube | ❌ CORS: no se puede leer el HTML, así que no hay lista de subtítulos |
+| Navegador → `api/timedtext` | ⚠️ 200 y **CORS permitido**, pero cuerpo **vacío** |
+| Servidor (fetch simple) → `api/timedtext` | ⚠️ mismo vacío, con y sin cookies de consentimiento |
+| Servidor → InnerTube (WEB/ANDROID/IOS/TVHTML5/MWEB) | ❌ `UNPLAYABLE` o 400 |
+| `yt-dlp` | ✅ subtítulos reales |
+
+El bloqueo no es de IP: es un token de sesión, y da igual desde dónde se pida. **Cloudflare Workers y Pages Functions no sirven** para esto porque ejecutan JS/WASM en un aislado V8 —`yt-dlp` es Python con extensiones C y sockets reales—, y un `fetch` desde el Worker se topa con el mismo cuerpo vacío. Lo que sí vale de Cloudflare son los **Containers**, que ejecutan imágenes Docker arbitrarias y podrían correr el `Dockerfile` de [`server/`](server/), pero requieren el plan **Workers Paid**.
 
 Por qué hace falta un servidor para la vía 1: el navegador no puede descargar el archivo (esos dominios no dan CORS) y el reproductor va en un iframe de otro origen, así que tampoco se puede leer su audio. Lo comprobé también contra los endpoints públicos: la lista de subtítulos de YouTube se obtiene, pero el endpoint que devuelve el texto responde vacío sin un token de sesión; TikTok bloquea por IP y la página de Instagram ya no trae la URL del vídeo. `yt-dlp` es lo que resuelve todo eso, y por eso el servicio lo usa.
 

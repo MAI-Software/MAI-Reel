@@ -1272,6 +1272,82 @@ window.addEventListener('keydown', (e) => {
 
 
 
+
+/* ---------- driving the embedded player (no server needed) ---------- */
+
+let ytDuration = 0;
+let ytTime = 0;
+let ytEnded = false;
+
+function ytFrame(): HTMLIFrameElement | null {
+  return document.querySelector<HTMLIFrameElement>('#trPlayerMedia iframe');
+}
+
+/** YouTube's iframe accepts commands over postMessage once enablejsapi is on. */
+function ytCommand(func: string, args: unknown[] = []): void {
+  ytFrame()?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+}
+
+function ytListen(): void {
+  ytFrame()?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'mai-reel' }), '*');
+}
+
+window.addEventListener('message', (e) => {
+  if (typeof e.data !== 'string' || !/youtube/.test(e.origin)) return;
+  let payload: { event?: string; info?: { currentTime?: number; duration?: number; playerState?: number } };
+  try {
+    payload = JSON.parse(e.data);
+  } catch {
+    return;
+  }
+  const info = payload.info;
+  if (!info) return;
+  if (typeof info.duration === 'number' && info.duration > 0) ytDuration = info.duration;
+  if (typeof info.currentTime === 'number') ytTime = info.currentTime;
+  if (info.playerState === 0) ytEnded = true;
+});
+
+/**
+ * No-server route: share this tab's audio once, let the video play from the start, stop when
+ * it ends and hand the recording to Whisper. Real time, so a three minute video takes three
+ * minutes — which is fine for the reels this is meant for.
+ */
+async function captureWholeVideo(): Promise<void> {
+  const status = $('captureStatus');
+  const start = $<HTMLButtonElement>('captureStart');
+  const stop = $<HTMLButtonElement>('captureStop');
+
+  ytEnded = false;
+  ytTime = 0;
+  try {
+    capture = await captureTabAudio();
+  } catch (err) {
+    const reason = err instanceof CaptureError ? err.reason : 'denied';
+    status.textContent = t(`cap.error.${reason}`);
+    return;
+  }
+
+  start.hidden = true;
+  stop.hidden = false;
+
+  if (embed?.controllable) {
+    ytListen();
+    ytCommand('seekTo', [0, true]);
+    ytCommand('unMute');
+    ytCommand('playVideo');
+  }
+
+  captureTimer = window.setInterval(() => {
+    const secs = capture ? capture.elapsed() : 0;
+    const total = ytDuration ? ` / ${fmt(ytDuration)}` : '';
+    status.textContent = `${t('cap.recording')} ${fmt(secs)}${total}`;
+    // stop on its own when the video is over
+    if (embed?.controllable && (ytEnded || (ytDuration && ytTime >= ytDuration - 0.4)) && secs > 2) {
+      void stopCapture();
+    }
+  }, 500);
+}
+
 /* ---------- extractor service: paste a link, get the transcript ---------- */
 
 let pendingLink = '';
@@ -1358,6 +1434,10 @@ function showEmbed(info: EmbedInfo, url: string): void {
   $('trPlayerName').textContent = url;
   $('trPlayerBox').hidden = false;
   $('captureStatus').textContent = isCaptureSupported() ? '' : t('cap.unsupported');
+  ytDuration = 0;
+  ytTime = 0;
+  ytEnded = false;
+  if (info.controllable) setTimeout(ytListen, 1200);
   activeCue = -1;
 }
 
@@ -1370,24 +1450,13 @@ function clearEmbed(): void {
 
 /** Records what this tab is playing and sends that audio to Whisper. */
 async function startCapture(): Promise<void> {
-  try {
-    capture = await captureTabAudio();
-  } catch (err) {
-    const reason = err instanceof CaptureError ? err.reason : 'denied';
-    $('captureStatus').textContent = t(`cap.error.${reason}`);
-    return;
-  }
-  $('captureStart').hidden = true;
-  $('captureStop').hidden = false;
-  captureTimer = window.setInterval(() => {
-    $('captureStatus').textContent = `${t('cap.recording')} ${capture ? capture.elapsed().toFixed(0) : 0}s`;
-  }, 500);
-  $('captureStatus').textContent = t('cap.recording');
+  await captureWholeVideo();
 }
 
 async function stopCapture(): Promise<void> {
   if (!capture) return;
   clearInterval(captureTimer);
+  if (embed?.controllable) ytCommand('pauseVideo');
   const blob = await capture.stop();
   capture = null;
   $('captureStart').hidden = false;
