@@ -1,5 +1,6 @@
 import type { SourceAudio } from '../engine/audio';
 import type { VoiceMap } from './voice';
+import type { Cue } from './transcribe';
 
 export interface Highlight {
   start: number;
@@ -7,7 +8,35 @@ export interface Highlight {
   /** 0..100, comparable between candidates of the same video. */
   score: number;
   /** Individual measurements, shown so the pick is auditable. */
-  parts: { speech: number; energy: number; dynamics: number; accents: number };
+  parts: { speech: number; energy: number; dynamics: number; accents: number; context: number };
+  /** What is actually said inside the window, when a transcript is available. */
+  text?: string;
+}
+
+/** Words that tend to open or close a shareable moment, across the five UI languages. */
+const HOOK_WORDS = [
+  'porque', 'nunca', 'siempre', 'error', 'secreto', 'nadie', 'truco', 'mira', 'gratis', 'cuidado',
+  'because', 'never', 'always', 'mistake', 'secret', 'nobody', 'trick', 'look', 'free', 'careful',
+  'parce', 'jamais', 'toujours', 'erreur', 'secret', 'personne', 'astuce', 'regarde', 'gratuit',
+  'weil', 'nie', 'immer', 'fehler', 'geheimnis', 'niemand', 'trick', 'schau', 'kostenlos',
+  'perché', 'mai', 'sempre', 'errore', 'segreto', 'nessuno', 'trucco', 'guarda', 'gratis',
+];
+
+/** How quotable the words inside a window are: density, questions, numbers and hook words. */
+function contextScore(cues: Cue[], start: number, end: number): { score: number; text: string } {
+  const inside = cues.filter((c) => c.end > start && c.start < end);
+  if (!inside.length) return { score: 0, text: '' };
+  const text = inside.map((c) => c.text).join(' ').trim();
+  const words = text.split(/\s+/).filter(Boolean);
+  const span = Math.max(1, end - start);
+
+  const density = Math.min(1, words.length / span / 2.6);
+  const questions = Math.min(1, (text.match(/[?¿]/g)?.length ?? 0) / 2);
+  const numbers = Math.min(1, (text.match(/\d+/g)?.length ?? 0) / 3);
+  const lower = text.toLowerCase();
+  const hooks = Math.min(1, HOOK_WORDS.filter((w) => lower.includes(w)).length / 3);
+
+  return { score: density * 0.4 + questions * 0.25 + hooks * 0.25 + numbers * 0.1, text };
 }
 
 const HOP = 1;
@@ -20,12 +49,22 @@ const HOP = 1;
 export function findHighlights(
   audio: SourceAudio,
   voice: VoiceMap,
-  opts: { duration: number; count?: number },
+  opts: { duration: number; count?: number; cues?: Cue[] },
 ): Highlight[] {
+  const cues = opts.cues ?? [];
   const total = audio.duration || audio.envelope.length / (audio.hz || 20);
   const win = Math.min(opts.duration, Math.max(4, total));
   if (total < win + 1) {
-    return [{ start: 0, end: total, score: 50, parts: { speech: voice.coverage, energy: 0, dynamics: 0, accents: 0 } }];
+    const only = contextScore(cues, 0, total);
+    return [
+      {
+        start: 0,
+        end: total,
+        score: 50,
+        parts: { speech: voice.coverage, energy: 0, dynamics: 0, accents: 0, context: only.score },
+        text: only.text,
+      },
+    ];
   }
 
   const hz = audio.hz || 20;
@@ -58,14 +97,18 @@ export function findHighlights(
     const dynamics = Math.max(0, max - min);
     const accents = voice.accents.filter((a) => a >= start && a < end).length / (win / 6);
 
-    const score =
+    const context = contextScore(cues, start, end);
+    // with a transcript the words carry a third of the decision; without one the audio does it all
+    const audioScore =
       speech * 45 + Math.min(1, energy / 0.6) * 22 + Math.min(1, dynamics / 0.7) * 18 + Math.min(1, accents) * 15;
+    const score = cues.length ? audioScore * 0.68 + context.score * 32 : audioScore;
 
     candidates.push({
       start,
       end,
       score,
-      parts: { speech, energy, dynamics, accents: Math.min(1, accents) },
+      parts: { speech, energy, dynamics, accents: Math.min(1, accents), context: context.score },
+      text: context.text,
     });
   }
 

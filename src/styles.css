@@ -1349,6 +1349,68 @@ body[data-tab='score'] .panel--score {
 }
 
 
+/* ---------- link import + transcription ---------- */
+
+.linkbox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.linkbox > label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.linkbox__row {
+  display: flex;
+  gap: 8px;
+}
+
+.linkbox input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.linkbox .btn {
+  flex: 0 0 auto;
+}
+
+.asr {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.asr select {
+  min-height: 44px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.clipcard__quote {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
 /* ---------- responsive overrides (kept last so they win by order) ---------- */
 
 @media (max-width: 1023px) {

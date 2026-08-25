@@ -79,6 +79,39 @@ Cada punto perdido genera un consejo concreto, ordenado por puntos perdidos y en
 - **Rendimiento**: la previsualización se renderiza al 45-60 % de la resolución final y sube a 1080×1920 solo al exportar.
 - Objetivos táctiles ≥44 px, foco visible, `prefers-reduced-motion` respetado y contraste verificado en oscuro.
 
+## Transcripción (voz → subtítulos)
+
+Botón **Transcribir** dentro de “Guion y subtítulos”. Corre **Whisper base** con transformers.js **en tu propio dispositivo**: el audio no sale del navegador.
+
+- La biblioteca se carga desde CDN y el modelo (~85 MB) se descarga la primera vez y queda en caché del navegador. Sin pulsar Transcribir no se descarga nada: el bundle de la app sigue en 144 KB.
+- Usa WebGPU si el dispositivo lo tiene, y WASM si no.
+- Selector de idioma (detectar automáticamente, o forzar ES/EN/FR/DE/IT).
+- El resultado llega con marcas de tiempo reales; se parte en bloques de ~34 caracteres y se coloca sobre la línea de tiempo. Los marcadores tipo `[BLANK_AUDIO]` o `[MUSIC]` se descartan.
+- El texto queda editable en el cuadro del guion: corriges y pulsas “Aplicar subtítulos”.
+- En modo **Multi**, la transcripción alimenta el ranking: además de voz, energía y dinámica, puntúa densidad de palabras, preguntas, cifras y palabras-gancho en los cinco idiomas.
+
+Medido con un clip de 11 s: detección de 4 frases y transcripción correcta en 4 bloques (`0.0-3.6s`, `3.6-7.2s`, `7.2-10.1s`, `10.1-11.0s`).
+
+## Cargar un vídeo desde un enlace
+
+Caja **“Pegar enlace de un vídeo”** en el panel de Material. Acepta enlaces **directos** a un archivo (`.mp4`, `.mov`, `.webm`, `.mp3`, `.wav`…) servidos con CORS abierto; muestra el progreso de descarga y, si el enlace es audio, lo carga como pista musical y como fuente de transcripción.
+
+Los enlaces de **YouTube, TikTok, Instagram, Facebook, X, Vimeo, Twitch o Drive no funcionan** y la app lo dice con un mensaje explícito en vez de fallar en silencio: esas páginas no son el archivo de vídeo y ningún navegador puede descargarlas por CORS y por sus términos de uso. Descarga el vídeo y súbelo como archivo.
+
+## App Android (APK)
+
+El proyecto lleva Capacitor configurado (`capacitor.config.ts`, id `com.maisoftwares.maireel`).
+
+```bash
+npm run android:add     # crea android/ (solo la primera vez)
+npm run android:apk     # build web + sync + gradlew assembleDebug
+npm run android:open    # abre el proyecto en Android Studio
+```
+
+Requiere JDK 17 (ya presente) y el **Android SDK** (Android Studio o `cmdline-tools`) con `ANDROID_HOME` configurado. El APK sale en `android/app/build/outputs/apk/debug/`.
+
+La transcripción también funciona en el APK: el WebView descarga el modelo la primera vez y lo cachea. Si quieres que funcione **sin internet desde el primer uso**, hay que empaquetar el runtime ONNX y los pesos en `android/app/src/main/assets` y apuntar ahí `env.localModelPath` (el APK pasa de ~5 MB a ~100 MB).
+
 ## Stack
 
 Vite + TypeScript, sin framework ni dependencias en runtime. Canvas 2D para el render, `MediaRecorder` para exportar, Web Audio para mezclar audio.

@@ -1,6 +1,6 @@
 import './styles.css';
 import { state, assetById, uid } from './state';
-import { setLang, t, SOURCES, LANGS, LANG_NAMES, type Lang } from './i18n';
+import { setLang, t, tf, SOURCES, LANGS, LANG_NAMES, type Lang } from './i18n';
 import { icons, brandMark } from './ui/icons';
 import { loadFiles, thumbnail } from './engine/media';
 import { buildProject, relayout, appendAssets, buildCaptions, TEMPLATES } from './engine/autoedit';
@@ -14,6 +14,8 @@ import { loadAudioFile, beatsInFragment, drawWaveform, analyzeFileAudio, type So
 import { detectVoice, timeBlocksToSpeech, type VoiceMap } from './analysis/voice';
 import { findHighlights, type Highlight } from './analysis/highlights';
 import { randomSeed, seedCode } from './engine/rng';
+import { transcribeFile, splitCues, isTranscriptionSupported, type Cue } from './analysis/transcribe';
+import { fetchMediaFromUrl, LinkError, platformOf } from './engine/fetchMedia';
 import { STYLE_PACKS, packById, autoDirect, formatReason, type Reason } from './engine/director';
 import { buildEntertainProject, idleEnhance } from './engine/autoedit';
 import { detectFocus } from './analysis/focus';
@@ -93,6 +95,15 @@ function shell(): string {
         <button class="btn btn--primary" id="pick">${icons.image}<span data-i18n="drop.button"></span></button>
         <input type="file" id="file" accept="image/*,video/*" multiple hidden />
       </div>
+      <div class="linkbox">
+        <label for="linkUrl" data-i18n="link.label"></label>
+        <div class="linkbox__row">
+          <input type="url" id="linkUrl" inputmode="url" autocomplete="off" />
+          <button class="btn btn--primary" id="linkLoad">${icons.download}<span data-i18n="link.load"></span></button>
+        </div>
+        <span class="empty-note" id="linkStatus" data-i18n="link.hint"></span>
+      </div>
+
       <div class="progress" id="importProgress" hidden>
         <div class="progress__track"><span class="progress__bar" id="importBar"></span></div>
         <span class="progress__label" id="importLabel"></span>
@@ -207,9 +218,26 @@ function shell(): string {
       <details class="disclosure">
         <summary>${icons.captions}<span data-i18n="group.captions"></span></summary>
         <div class="field">
+          <div class="asr">
+            <div class="row">
+              <select id="asrLang">
+                <option value="auto" data-i18n="asr.auto"></option>
+                ${LANGS.map((l) => `<option value="${l}">${LANG_NAMES[l]}</option>`).join('')}
+              </select>
+              <button class="btn btn--accent btn--sm" id="transcribe">${icons.captions}<span data-i18n="asr.run"></span></button>
+            </div>
+            <div class="progress" id="asrProgress" hidden>
+              <div class="progress__track"><span class="progress__bar" id="asrBar"></span></div>
+              <span class="progress__label" id="asrLabel"></span>
+            </div>
+            <span class="empty-note" data-i18n="asr.hint"></span>
+          </div>
           <textarea id="script" rows="3"></textarea>
           <span class="empty-note" data-i18n="script.hint"></span>
-          <button class="btn btn--sm" id="captions">${icons.captions}<span data-i18n="script.generate"></span></button>
+          <div class="row">
+            <button class="btn btn--sm" id="captions">${icons.captions}<span data-i18n="script.generate"></span></button>
+            <button class="btn btn--sm" id="applyCues" hidden>${icons.spark}<span data-i18n="asr.apply"></span></button>
+          </div>
         </div>
       </details>
       <details class="disclosure" id="audioGroup">
@@ -368,6 +396,7 @@ let voice: VoiceMap | null = null;
 let highlights: Highlight[] = [];
 let multiLength = 30;
 let focusPoint: { x: number; y: number } | null = null;
+let cues: Cue[] = [];
 
 /* ---------- i18n ---------- */
 
@@ -1091,6 +1120,7 @@ $<HTMLInputElement>('audioFile').addEventListener('change', async (e) => {
   const track = await loadAudioFile(file);
   state.audio?.el.pause();
   state.audio = track;
+  state.audioFile = file;
   $('audioName').textContent = file.name;
   ($('audioGroup') as HTMLDetailsElement).open = true;
   audioInRange.value = '0';
@@ -1100,6 +1130,7 @@ $<HTMLInputElement>('audioFile').addEventListener('change', async (e) => {
 $('audioClear').addEventListener('click', () => {
   state.audio?.el.pause();
   state.audio = null;
+  state.audioFile = null;
   snapBeats.checked = false;
   $('audioName').textContent = t('audio.none');
   renderAudio();
@@ -1209,6 +1240,133 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+
+
+/* ---------- link import and transcription ---------- */
+
+async function loadFromLink(): Promise<void> {
+  const input = $<HTMLInputElement>('linkUrl');
+  const status = $('linkStatus');
+  const url = input.value.trim();
+  if (!url) return;
+
+  const platform = platformOf(url);
+  if (platform) {
+    status.textContent = tf('link.platform', { host: platform });
+    return;
+  }
+
+  const btn = $<HTMLButtonElement>('linkLoad');
+  btn.disabled = true;
+  status.textContent = t('link.loading');
+  try {
+    const file = await fetchMediaFromUrl(url, (loaded, total) => {
+      status.textContent = total
+        ? `${t('link.loading')} ${Math.round((loaded / total) * 100)}%`
+        : `${t('link.loading')} ${(loaded / 1048576).toFixed(1)} MB`;
+    });
+    if (file.type.startsWith('audio/')) {
+      const track = await loadAudioFile(file);
+      state.audio?.el.pause();
+      state.audio = track;
+      state.audioFile = file;
+      ($('audioGroup') as HTMLDetailsElement).open = true;
+      $('audioName').textContent = file.name;
+      audioInRange.value = '0';
+      renderAudio();
+    } else {
+      await addFiles([file]);
+    }
+    status.textContent = `${file.name} · ${(file.size / 1048576).toFixed(1)} MB`;
+    input.value = '';
+  } catch (err) {
+    const reason = err instanceof LinkError ? err.reason : 'network';
+    status.textContent = t(`link.error.${reason}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/** Runs Whisper on the imported video and turns the transcript into caption blocks. */
+async function runTranscription(): Promise<void> {
+  const source =
+    state.assets.find((a) => a.kind === 'video' && a.file)?.file ??
+    state.audioFile ??
+    state.assets.find((a) => a.file)?.file;
+  if (!source) {
+    toast(t('asr.needMedia'));
+    return;
+  }
+  if (!isTranscriptionSupported()) {
+    toast(t('asr.unsupported'));
+    return;
+  }
+
+  const btn = $<HTMLButtonElement>('transcribe');
+  const bar = $('asrBar');
+  const label = $('asrLabel');
+  btn.disabled = true;
+  $('asrProgress').hidden = false;
+  label.textContent = t('asr.loading');
+  player.pause();
+
+  try {
+    const found = await transcribeFile(source, {
+      language: $<HTMLSelectElement>('asrLang').value,
+      onProgress: (p) => {
+        bar.style.width = `${Math.round(p.progress * 100)}%`;
+        label.textContent = p.stage === 'download' ? `${t('asr.loading')} ${Math.round(p.progress * 100)}%` : t('asr.running');
+      },
+    });
+    cues = splitCues(found);
+    scriptInput.value = found.map((c) => c.text).join(' ');
+    $('applyCues').hidden = cues.length === 0;
+    label.textContent = `${cues.length} ${t('asr.blocks')}`;
+    if (cues.length) applyCues();
+    else toast(t('asr.empty'));
+  } catch (err) {
+    label.textContent = t('asr.failed');
+    toast(String(err instanceof Error ? err.message : err).slice(0, 120));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/** Writes the transcript onto the timeline with its real timings, trimmed to the current clip. */
+function applyCues(): void {
+  if (!cues.length) return;
+  const duration = totalDuration(state.project);
+  if (duration < 0.2) {
+    // there is a transcript but no timeline to put it on yet
+    toast(t('asr.needMedia'));
+    return;
+  }
+  const offset = state.project.clips[0]?.srcIn ?? 0;
+  state.project.texts = state.project.texts.filter((x) => x.role !== 'caption');
+
+  let added = 0;
+  for (const cue of cues) {
+    const start = cue.start - offset;
+    const end = cue.end - offset;
+    if (end <= 0.05 || start >= duration) continue;
+    state.project.texts.push({
+      id: uid('t'),
+      text: cue.text,
+      start: Math.max(0, start),
+      end: Math.min(duration, Math.max(start + 0.4, end)),
+      role: 'caption',
+      y: 0.74,
+      size: 56,
+      fontId: fontSel.value,
+      styleId: styleSel.value,
+      anim: 'pop',
+    });
+    added++;
+  }
+  touch();
+  renderBlocks();
+  toast(`${added} ${t('toast.captions')}`);
+}
 
 /* ---------- quick styles, auto director, entertainment mode ---------- */
 
@@ -1411,7 +1569,8 @@ function renderHighlights(): void {
           <b>${fmt(h.start)} → ${fmt(h.end)}</b>
           <small>${t('multi.speech')} ${Math.round(h.parts.speech * 100)}% · ${t('multi.energy')} ${Math.round(
             h.parts.energy * 100,
-          )}% · ${t('multi.dynamics')} ${Math.round(h.parts.dynamics * 100)}%</small>
+          )}%${h.parts.context ? ` · ${t('multi.context')} ${Math.round(h.parts.context * 100)}%` : ''}</small>
+          ${h.text ? `<small class="clipcard__quote">“${h.text.slice(0, 90)}”</small>` : ''}
         </span>
       </button>`,
     )
@@ -1429,7 +1588,7 @@ async function findClips(): Promise<void> {
     toast(t('voice.none'));
     return;
   }
-  highlights = findHighlights(sourceAudio, voice, { duration: multiLength, count: 5 });
+  highlights = findHighlights(sourceAudio, voice, { duration: multiLength, count: 5, cues });
   renderHighlights();
   toast(`${highlights.length} ${t('multi.found')}`);
 }
@@ -1513,6 +1672,12 @@ $('variant').addEventListener('click', () => {
   toast(`#${seedCode(state.project.seed)}`);
 });
 $('viralCaptions').addEventListener('click', viralCaptions);
+$('linkLoad').addEventListener('click', () => void loadFromLink());
+$<HTMLInputElement>('linkUrl').addEventListener('keydown', (e) => {
+  if ((e as KeyboardEvent).key === 'Enter') void loadFromLink();
+});
+$('transcribe').addEventListener('click', () => void runTranscription());
+$('applyCues').addEventListener('click', applyCues);
 $('findClips').addEventListener('click', () => void findClips());
 $('multiLen').addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-mlen]');
@@ -1557,6 +1722,7 @@ setView((localStorage.getItem('mai-reel-view') as 'all' | 'tabs') === 'all' ? 'a
 renderSeed();
 // the picker has to show the language that was restored from storage or the browser
 $<HTMLSelectElement>('lang').value = state.lang;
+$<HTMLSelectElement>('asrLang').value = state.lang;
 // on a wide screen there is room for everything, so these groups start open
 for (const id of ['settingsGroup', 'textsGroup']) {
   ($(id) as HTMLDetailsElement).open = wideScreen.matches;

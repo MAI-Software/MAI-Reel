@@ -7,6 +7,8 @@ export interface AppState {
   assets: MediaAsset[];
   project: Project;
   audio: AudioTrack | null;
+  /** Original file of the music track, kept so it can also be transcribed. */
+  audioFile: File | null;
   time: number;
   playing: boolean;
   lang: Lang;
@@ -43,6 +45,7 @@ export const state: AppState = {
     },
   },
   audio: null,
+  audioFile: null,
   time: 0,
   playing: false,
   lang: initialLang(),
