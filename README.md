@@ -98,21 +98,28 @@ Caja **“Pegar enlace de un vídeo”** en el panel de Material. Acepta enlaces
 
 Los enlaces de **YouTube, TikTok, Instagram, Facebook, X, Vimeo, Twitch o Drive no funcionan** y la app lo dice con un mensaje explícito en vez de fallar en silencio: esas páginas no son el archivo de vídeo y ningún navegador puede descargarlas por CORS y por sus términos de uso. Descarga el vídeo y súbelo como archivo.
 
-## App Android (APK)
+## PWA e app Android (APK)
 
-El proyecto lleva Capacitor configurado (`capacitor.config.ts`, id `com.maisoftwares.maireel`).
+La app es una **PWA instalable**: `manifest.webmanifest`, service worker con caché del shell y de los assets versionados, iconos 192/512 + maskable y metas de iOS. Se instala desde el navegador ("Añadir a pantalla de inicio") y arranca en modo standalone sin barra de navegador.
+
+**APK sin Android SDK (la vía de las otras webs):** una vez desplegada en Cloudflare Pages, se genera el APK/AAB desde la propia PWA con [PWABuilder](https://www.pwabuilder.com) o `bubblewrap` (TWA). Pasos:
+
+1. Desplegar (build `npm run build`, output `dist`).
+2. Meter la URL en PWABuilder → *Package for stores* → Android.
+3. Descargar el paquete y subir `assetlinks.json` a `/.well-known/assetlinks.json` del sitio para que el TWA arranque sin barra de navegador.
+
+Con la app instalada como TWA, la transcripción funciona igual: usa el motor del sistema, baja el modelo la primera vez y lo cachea.
+
+**Alternativa con Capacitor** (solo si hace falta código nativo): ya está configurado (`capacitor.config.ts`, id `com.maisoftwares.maireel`).
 
 ```bash
-npm run android:add     # crea android/ (solo la primera vez)
+npm run android:add     # crea android/ (una vez)
 npm run android:apk     # build web + sync + gradlew assembleDebug
-npm run android:open    # abre el proyecto en Android Studio
 ```
 
-Requiere JDK 17 (ya presente) y el **Android SDK** (Android Studio o `cmdline-tools`) con `ANDROID_HOME` configurado. El APK sale en `android/app/build/outputs/apk/debug/`.
+Esta vía sí necesita JDK 17 y el Android SDK con `ANDROID_HOME`.
 
-La transcripción también funciona en el APK: el WebView descarga el modelo la primera vez y lo cachea. Si quieres que funcione **sin internet desde el primer uso**, hay que empaquetar el runtime ONNX y los pesos en `android/app/src/main/assets` y apuntar ahí `env.localModelPath` (el APK pasa de ~5 MB a ~100 MB).
-
-## Stack
+## Stack## Stack
 
 Vite + TypeScript, sin framework ni dependencias en runtime. Canvas 2D para el render, `MediaRecorder` para exportar, Web Audio para mezclar audio.
 

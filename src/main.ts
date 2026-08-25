@@ -1738,3 +1738,10 @@ rebuild();
 renderStrip();
 updateTransport();
 void ensureFontsLoaded().then(() => player.seek(state.time));
+
+// installable app: the service worker only runs from a built deploy, never from `vite dev`
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+  });
+}
