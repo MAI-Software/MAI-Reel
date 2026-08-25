@@ -4,13 +4,18 @@ Editor web de reels rápido y automático, optimizado para móvil y escritorio. 
 
 Todo el procesamiento ocurre en el navegador: ningún archivo se sube a ningún servidor.
 
-## Tres modos
+## Cuatro secciones
 
-| Modo | Para qué | Qué hace |
+La navegación principal son cuatro secciones; cada una muestra solo lo que necesita.
+
+| Sección | Para qué | Qué ve el usuario |
 |---|---|---|
-| **Viralizar** | Un vídeo ya montado (CapCut y similares) | Decodifica su audio, detecta voz, golpes y sujeto, y añade movimiento de cámara, tambaleo al ritmo y **zoom dramático sobre la voz**. Los subtítulos que pegues se colocan sobre las frases habladas, no sobre los silencios. Nunca tapa lo que ya trae el vídeo. |
-| **Construcción** | Fotos y clips sueltos | El editor completo: plantillas, efectos, transiciones, colores, textos y score. **Cada versión sale distinta** — botón `Otra versión`. |
-| **Multi** | Un vídeo largo (podcast, directo, YouTube) | Analiza toda la pista, puntúa ventanas de 15/30/45/60 s por densidad de voz, energía y contraste dinámico, ajusta los cortes a los silencios y propone los mejores momentos para recortar. |
+| **Transcribir** | "He visto un reel y quiero su texto" | Importar o pegar enlace + botón Transcribir. Sale la transcripción con marcas de tiempo, y se copia, se baja en `.SRT` o `.TXT`, o se aplica como subtítulos. Nada más en pantalla. |
+| **Viralizar** | Un vídeo ya montado (CapCut y similares) | Intensidad, zoom dramático con la voz, tambaleo, protección de subtítulos incrustados. No añade textos ni cortes. |
+| **Crear** | Fotos y clips sueltos | El editor completo: montaje automático, estilos rápidos, ritmo, tipografía, audio y score. Cada versión sale distinta. |
+| **Recortes** | Vídeo largo (podcast, directo, YouTube) | Duración del recorte y buscador de los mejores momentos, puntuados por voz, energía, dinámica y contexto del texto. |
+
+La sección se guarda y va en el hash (`#transcribe`, `#boost`, `#build`, `#multi`), así que se puede enlazar directamente.
 
 ## Variación
 

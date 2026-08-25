@@ -23,9 +23,6 @@ import type { Aspect, Effect, Enhance, Grade, MediaAsset, ReelMode, TemplateId, 
 
 const PARENT_SITE = 'https://mai-softwares.com';
 const REPO = 'https://github.com/MAI-Software/MAI-Reel';
-const TABS = ['media', 'edit', 'blocks', 'score'] as const;
-type Tab = (typeof TABS)[number];
-
 const EFFECTS: Effect[] = [
   'none',
   'zoom-in',
@@ -63,6 +60,16 @@ const options = (values: string[], selected: string, labelKey: (v: string) => st
     .map((v) => `<option value="${v}" ${v === selected ? 'selected' : ''}>${t(labelKey(v))}</option>`)
     .join('');
 
+const SECTIONS = ['transcribe', 'boost', 'build', 'multi'] as const;
+type Section = (typeof SECTIONS)[number];
+
+const SECTION_ICON: Record<Section, string> = {
+  transcribe: icons.captions,
+  boost: icons.spark,
+  build: icons.wand,
+  multi: icons.layers,
+};
+
 function shell(): string {
   return `
   <header class="topbar" id="topbar">
@@ -71,9 +78,6 @@ function shell(): string {
     </a>
     <span class="topbar__tag" data-i18n="app.tagline"></span>
     <span class="topbar__spacer"></span>
-    <button class="chip chip--view" id="viewToggle" aria-pressed="false">
-      ${icons.layers}<span data-i18n="view.all"></span>
-    </button>
     <button class="chip chip--score" id="scoreChip" hidden>
       ${icons.target}<strong id="scoreChipVal">--</strong><small>/100</small>
     </button>
@@ -86,14 +90,26 @@ function shell(): string {
     </label>
   </header>
 
+  <nav class="sections" id="sections" role="tablist" aria-label="secciones">
+    ${SECTIONS.map(
+      (id) => `<button role="tab" data-section="${id}" aria-selected="${id === 'transcribe'}">
+        ${SECTION_ICON[id]}
+        <span>
+          <strong data-i18n="section.${id}"></strong>
+          <small data-i18n="section.${id}.sub"></small>
+        </span>
+      </button>`,
+    ).join('')}
+  </nav>
+
   <main class="layout">
-    <div class="col col--left">
     <section class="panel panel--media" aria-label="media" id="panel-media">
+      <h2 class="panel__title" data-i18n="nav.media"></h2>
       <div class="dropzone" id="drop">
-        <h2 data-i18n="drop.title"></h2>
+        <h3 data-i18n="drop.title"></h3>
         <p data-i18n="drop.hint"></p>
         <button class="btn btn--primary" id="pick">${icons.image}<span data-i18n="drop.button"></span></button>
-        <input type="file" id="file" accept="image/*,video/*" multiple hidden />
+        <input type="file" id="file" accept="image/*,video/*,audio/*" multiple hidden />
       </div>
       <div class="linkbox">
         <label for="linkUrl" data-i18n="link.label"></label>
@@ -103,7 +119,6 @@ function shell(): string {
         </div>
         <span class="empty-note" id="linkStatus" data-i18n="link.hint"></span>
       </div>
-
       <div class="progress" id="importProgress" hidden>
         <div class="progress__track"><span class="progress__bar" id="importBar"></span></div>
         <span class="progress__label" id="importLabel"></span>
@@ -115,153 +130,36 @@ function shell(): string {
       </div>
     </section>
 
-    <section class="panel panel--edit" aria-label="edit" id="panel-edit">
-      <h2 class="panel__title" data-i18n="nav.edit"></h2>
-      <div class="segmented segmented--3" id="modeSwitch" role="group">
-        <button type="button" data-mode="viral" aria-pressed="false" data-i18n="mode.viral"></button>
-        <button type="button" data-mode="build" aria-pressed="true" data-i18n="mode.build"></button>
-        <button type="button" data-mode="multi" aria-pressed="false" data-i18n="mode.multi"></button>
-      </div>
-      <p class="empty-note" id="modeHint" data-i18n="mode.build.hint"></p>
-
-      <div class="entertain" id="entertainBox" hidden>
-        <p class="empty-note" id="entertainInfo" data-i18n="entertain.hint"></p>
-        <label class="block__range"><span data-i18n="entertain.intensity"></span> <output id="enIntensityVal">60%</output>
-          <input type="range" id="enIntensity" min="10" max="100" step="5" value="60" />
-        </label>
-        <label class="block__range"><span data-i18n="entertain.drama"></span> <output id="enDramaVal">60%</output>
-          <input type="range" id="enDrama" min="0" max="100" step="5" value="60" />
-        </label>
-        <label class="toggle"><input type="checkbox" id="enShake" checked /><span data-i18n="entertain.shake"></span></label>
-        <label class="toggle"><input type="checkbox" id="enFace" checked /><span data-i18n="entertain.face"></span></label>
-        <label class="toggle"><input type="checkbox" id="enProtect" checked /><span data-i18n="entertain.protect"></span></label>
-        <button class="btn btn--sm" id="viralCaptions">${icons.captions}<span data-i18n="entertain.captions"></span></button>
-        <span class="empty-note" data-i18n="entertain.captionsHint"></span>
-      </div>
-
-      <div class="entertain" id="multiBox" hidden>
-        <p class="empty-note" id="multiInfo" data-i18n="multi.hint"></p>
-        <div class="chips" id="multiLen" role="group">
-          ${[15, 30, 45, 60].map((n) => `<button type="button" data-mlen="${n}">${n}s</button>`).join('')}
-        </div>
-        <button class="btn btn--primary" id="findClips">${icons.spark}<span data-i18n="multi.find"></span></button>
-        <div id="multiList"></div>
-      </div>
-
-      <div class="field" id="autoField">
-        <button class="btn btn--primary" id="auto">${icons.spark}<span data-i18n="action.auto"></span></button>
-        <div class="row">
-          <button class="btn btn--sm" id="variant">${icons.wand}<span data-i18n="action.variant"></span></button>
-          <span class="empty-note" id="seedLabel"></span>
-        </div>
-        <span class="empty-note" id="autoWhy" data-i18n="action.autoHint"></span>
-      </div>
-
-      <div class="field" id="packField">
-        <label data-i18n="quick.label"></label>
-        <div class="chips chips--wrap" id="packs">
-          ${STYLE_PACKS.map((p) => `<button type="button" data-pack="${p.id}" data-i18n="pack.${p.id}"></button>`).join('')}
-        </div>
-      </div>
-      <details class="disclosure" id="settingsGroup">
-        <summary>${icons.sliders}<span data-i18n="group.settings"></span></summary>
-      <div class="field">
-        <label for="template" data-i18n="template.label"></label>
-        <select id="template">
-          <option value="punch" data-i18n="template.punch"></option>
-          <option value="flow" data-i18n="template.flow"></option>
-          <option value="story" data-i18n="template.story"></option>
+    <section class="panel panel--transcript" aria-label="transcript" id="panel-transcript">
+      <h2 class="panel__title" data-i18n="section.transcribe"></h2>
+      <div class="row">
+        <select id="asrLang">
+          <option value="auto" data-i18n="asr.auto"></option>
+          ${LANGS.map((l) => `<option value="${l}">${LANG_NAMES[l]}</option>`).join('')}
         </select>
+        <button class="btn btn--primary" id="transcribe">${icons.captions}<span data-i18n="asr.run"></span></button>
       </div>
-      <div class="grid-2">
-        <div class="field">
-          <label for="aspect" data-i18n="aspect.label"></label>
-          <select id="aspect">
-            <option value="9:16">9:16 · Reels</option>
-            <option value="4:5">4:5 · feed</option>
-            <option value="1:1">1:1 · square</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="target"><span data-i18n="duration.label"></span> <output id="targetVal">12s</output></label>
-          <input type="range" id="target" min="${MIN_DURATION}" max="60" step="1" value="12" />
-          <div class="chips" id="lenChips" role="group">
-            ${LENGTH_PRESETS.map((n) => `<button type="button" data-len="${n}">${n}s</button>`).join('')}
-            <button type="button" data-len="manual" data-i18n="duration.manual"></button>
-          </div>
-        </div>
+      <div class="progress" id="asrProgress" hidden>
+        <div class="progress__track"><span class="progress__bar" id="asrBar"></span></div>
+        <span class="progress__label" id="asrLabel"></span>
       </div>
-      <div class="grid-2">
-        <div class="field">
-          <label for="font" data-i18n="font.label"></label>
-          <select id="font">${FONTS.map((f) => `<option value="${f.id}" style="font-family:${f.family}">${f.label}</option>`).join('')}</select>
-        </div>
-        <div class="field">
-          <label for="style" data-i18n="style.label"></label>
-          <select id="style">${TEXT_STYLES.map((s) => `<option value="${s.id}">${s.label}</option>`).join('')}</select>
-        </div>
+      <span class="empty-note" data-i18n="asr.hint"></span>
+      <div id="transcript"></div>
+      <div class="row" id="transcriptActions" hidden>
+        <button class="btn btn--sm" id="copyText">${icons.captions}<span data-i18n="tr.copy"></span></button>
+        <button class="btn btn--sm" id="downloadSrt">${icons.download}<span>.SRT</span></button>
+        <button class="btn btn--sm" id="downloadTxt">${icons.download}<span>.TXT</span></button>
+        <button class="btn btn--sm btn--primary" id="applyCues">${icons.spark}<span data-i18n="asr.apply"></span></button>
       </div>
-      </details>
-      <details class="disclosure" id="textsGroup">
-        <summary>${icons.captions}<span data-i18n="group.texts"></span></summary>
-      <div class="grid-2">
+      <details class="disclosure" id="manualGroup">
+        <summary>${icons.sliders}<span data-i18n="tr.manual"></span></summary>
         <div class="field">
-          <label for="hook" data-i18n="hook.label"></label>
-          <input type="text" id="hook" maxlength="80" />
-        </div>
-        <div class="field">
-          <label for="cta" data-i18n="cta.label"></label>
-          <input type="text" id="cta" maxlength="60" />
-        </div>
-      </div>
-      </details>
-      <details class="disclosure">
-        <summary>${icons.captions}<span data-i18n="group.captions"></span></summary>
-        <div class="field">
-          <div class="asr">
-            <div class="row">
-              <select id="asrLang">
-                <option value="auto" data-i18n="asr.auto"></option>
-                ${LANGS.map((l) => `<option value="${l}">${LANG_NAMES[l]}</option>`).join('')}
-              </select>
-              <button class="btn btn--accent btn--sm" id="transcribe">${icons.captions}<span data-i18n="asr.run"></span></button>
-            </div>
-            <div class="progress" id="asrProgress" hidden>
-              <div class="progress__track"><span class="progress__bar" id="asrBar"></span></div>
-              <span class="progress__label" id="asrLabel"></span>
-            </div>
-            <span class="empty-note" data-i18n="asr.hint"></span>
-          </div>
           <textarea id="script" rows="3"></textarea>
           <span class="empty-note" data-i18n="script.hint"></span>
-          <div class="row">
-            <button class="btn btn--sm" id="captions">${icons.captions}<span data-i18n="script.generate"></span></button>
-            <button class="btn btn--sm" id="applyCues" hidden>${icons.spark}<span data-i18n="asr.apply"></span></button>
-          </div>
+          <button class="btn btn--sm" id="captions">${icons.captions}<span data-i18n="script.generate"></span></button>
         </div>
       </details>
-      <details class="disclosure" id="audioGroup">
-        <summary>${icons.music}<span data-i18n="group.audio"></span></summary>
-        <div class="row">
-          <button class="btn btn--sm" id="audioPick">${icons.music}<span data-i18n="audio.pick"></span></button>
-          <button class="btn btn--sm btn--ghost" id="audioClear">${icons.close}<span data-i18n="audio.remove"></span></button>
-        </div>
-        <span class="empty-note" id="audioName" data-i18n="audio.none"></span>
-        <input type="file" id="audioFile" accept="audio/*" hidden />
-        <div class="audio" id="audioBox" hidden>
-          <canvas class="wave" id="wave" aria-label="waveform"></canvas>
-          <span class="empty-note" id="audioMeta"></span>
-          <label class="block__range"><span data-i18n="audio.fragment"></span> <output id="audioInVal">0.0s</output>
-            <input type="range" id="audioIn" min="0" max="10" step="0.1" value="0" />
-          </label>
-          <label class="toggle"><input type="checkbox" id="snapBeats" /><span data-i18n="audio.sync"></span></label>
-          <button class="btn btn--sm" id="audioPreview">${icons.play}<span data-i18n="audio.preview"></span></button>
-        </div>
-      </details>
-      <button class="btn btn--primary" id="rebuild">${icons.wand}<span data-i18n="action.rebuild"></span></button>
-      <span class="empty-note" data-i18n="action.rebuildWarn"></span>
     </section>
-    </div>
 
     <section class="stage" id="stage">
       <div class="viewport" id="viewport">
@@ -288,7 +186,130 @@ function shell(): string {
       <p class="empty-note" data-i18n="export.hint"></p>
     </section>
 
-    <div class="col col--right">
+    <section class="panel panel--boost" aria-label="boost" id="panel-boost">
+      <h2 class="panel__title" data-i18n="section.boost"></h2>
+      <div class="entertain" id="entertainBox">
+        <p class="empty-note" id="entertainInfo" data-i18n="entertain.hint"></p>
+        <label class="block__range"><span data-i18n="entertain.intensity"></span> <output id="enIntensityVal">60%</output>
+          <input type="range" id="enIntensity" min="10" max="100" step="5" value="60" />
+        </label>
+        <label class="block__range"><span data-i18n="entertain.drama"></span> <output id="enDramaVal">60%</output>
+          <input type="range" id="enDrama" min="0" max="100" step="5" value="60" />
+        </label>
+        <label class="toggle"><input type="checkbox" id="enShake" checked /><span data-i18n="entertain.shake"></span></label>
+        <label class="toggle"><input type="checkbox" id="enFace" checked /><span data-i18n="entertain.face"></span></label>
+        <label class="toggle"><input type="checkbox" id="enProtect" checked /><span data-i18n="entertain.protect"></span></label>
+        <button class="btn btn--sm" id="viralCaptions">${icons.captions}<span data-i18n="entertain.captions"></span></button>
+      </div>
+    </section>
+
+    <section class="panel panel--multi" aria-label="multi" id="panel-multi">
+      <h2 class="panel__title" data-i18n="section.multi"></h2>
+      <div class="entertain" id="multiBox">
+        <p class="empty-note" id="multiInfo" data-i18n="multi.hint"></p>
+        <div class="chips" id="multiLen" role="group">
+          ${[15, 30, 45, 60].map((n) => `<button type="button" data-mlen="${n}">${n}s</button>`).join('')}
+        </div>
+        <button class="btn btn--primary" id="findClips">${icons.spark}<span data-i18n="multi.find"></span></button>
+        <div id="multiList"></div>
+      </div>
+    </section>
+
+    <section class="panel panel--edit" aria-label="edit" id="panel-edit">
+      <h2 class="panel__title" data-i18n="section.build"></h2>
+      <div class="field">
+        <button class="btn btn--primary" id="auto">${icons.spark}<span data-i18n="action.auto"></span></button>
+        <div class="row">
+          <button class="btn btn--sm" id="variant">${icons.wand}<span data-i18n="action.variant"></span></button>
+          <span class="empty-note" id="seedLabel"></span>
+        </div>
+        <span class="empty-note" id="autoWhy" data-i18n="action.autoHint"></span>
+      </div>
+
+      <div class="field">
+        <label data-i18n="quick.label"></label>
+        <div class="chips chips--wrap" id="packs">
+          ${STYLE_PACKS.map((p) => `<button type="button" data-pack="${p.id}" data-i18n="pack.${p.id}"></button>`).join('')}
+        </div>
+      </div>
+
+      <details class="disclosure" id="settingsGroup">
+        <summary>${icons.sliders}<span data-i18n="group.settings"></span></summary>
+        <div class="field">
+          <label for="template" data-i18n="template.label"></label>
+          <select id="template">
+            <option value="punch" data-i18n="template.punch"></option>
+            <option value="flow" data-i18n="template.flow"></option>
+            <option value="story" data-i18n="template.story"></option>
+          </select>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="aspect" data-i18n="aspect.label"></label>
+            <select id="aspect">
+              <option value="9:16">9:16 · Reels</option>
+              <option value="4:5">4:5 · feed</option>
+              <option value="1:1">1:1 · square</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="target"><span data-i18n="duration.label"></span> <output id="targetVal">12s</output></label>
+            <input type="range" id="target" min="${MIN_DURATION}" max="60" step="1" value="12" />
+            <div class="chips" id="lenChips" role="group">
+              ${LENGTH_PRESETS.map((n) => `<button type="button" data-len="${n}">${n}s</button>`).join('')}
+              <button type="button" data-len="manual" data-i18n="duration.manual"></button>
+            </div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="font" data-i18n="font.label"></label>
+            <select id="font">${FONTS.map((f) => `<option value="${f.id}" style="font-family:${f.family}">${f.label}</option>`).join('')}</select>
+          </div>
+          <div class="field">
+            <label for="style" data-i18n="style.label"></label>
+            <select id="style">${TEXT_STYLES.map((x) => `<option value="${x.id}">${x.label}</option>`).join('')}</select>
+          </div>
+        </div>
+      </details>
+
+      <details class="disclosure" id="textsGroup">
+        <summary>${icons.captions}<span data-i18n="group.texts"></span></summary>
+        <div class="grid-2">
+          <div class="field">
+            <label for="hook" data-i18n="hook.label"></label>
+            <input type="text" id="hook" maxlength="80" />
+          </div>
+          <div class="field">
+            <label for="cta" data-i18n="cta.label"></label>
+            <input type="text" id="cta" maxlength="60" />
+          </div>
+        </div>
+      </details>
+
+      <details class="disclosure" id="audioGroup">
+        <summary>${icons.music}<span data-i18n="group.audio"></span></summary>
+        <div class="row">
+          <button class="btn btn--sm" id="audioPick">${icons.music}<span data-i18n="audio.pick"></span></button>
+          <button class="btn btn--sm btn--ghost" id="audioClear">${icons.close}<span data-i18n="audio.remove"></span></button>
+        </div>
+        <span class="empty-note" id="audioName" data-i18n="audio.none"></span>
+        <input type="file" id="audioFile" accept="audio/*" hidden />
+        <div class="audio" id="audioBox" hidden>
+          <canvas class="wave" id="wave" aria-label="waveform"></canvas>
+          <span class="empty-note" id="audioMeta"></span>
+          <label class="block__range"><span data-i18n="audio.fragment"></span> <output id="audioInVal">0.0s</output>
+            <input type="range" id="audioIn" min="0" max="10" step="0.1" value="0" />
+          </label>
+          <label class="toggle"><input type="checkbox" id="snapBeats" /><span data-i18n="audio.sync"></span></label>
+          <button class="btn btn--sm" id="audioPreview">${icons.play}<span data-i18n="audio.preview"></span></button>
+        </div>
+      </details>
+
+      <button class="btn btn--primary" id="rebuild">${icons.wand}<span data-i18n="action.rebuild"></span></button>
+      <span class="empty-note" data-i18n="action.rebuildWarn"></span>
+    </section>
+
     <section class="panel panel--blocks" aria-label="blocks" id="panel-blocks">
       <h2 class="panel__title" data-i18n="nav.blocks"></h2>
       <div id="blocks"></div>
@@ -303,10 +324,9 @@ function shell(): string {
       </a>
       <div class="sources">
         <strong data-i18n="score.sources"></strong>
-        ${SOURCES.map((s) => `<a href="${s.url}" target="_blank" rel="noopener noreferrer">${s.label}</a>`).join('')}
+        ${SOURCES.map((x) => `<a href="${x.url}" target="_blank" rel="noopener noreferrer">${x.label}</a>`).join('')}
       </div>
     </section>
-    </div>
   </main>
 
   <footer class="footer">
@@ -324,17 +344,7 @@ function shell(): string {
       <a href="${REPO}" target="_blank" rel="noopener noreferrer">GitHub</a>
       <span data-i18n="footer.license"></span>
     </nav>
-  </footer>
-
-  <nav class="tabbar" role="tablist" aria-label="secciones">
-    ${TABS.map(
-      (id) => `<button role="tab" data-goto="${id}" aria-controls="panel-${id}" aria-selected="${id === 'media'}">
-        ${icons[id === 'media' ? 'image' : id === 'edit' ? 'sliders' : id === 'blocks' ? 'layers' : 'target']}
-        <span data-i18n="nav.${id}"></span>
-        <em class="tabbar__badge" data-badge="${id}" hidden></em>
-      </button>`,
-    ).join('')}
-  </nav>`;
+  </footer>`;
 }
 
 app.innerHTML = shell();
@@ -415,6 +425,7 @@ function applyI18n(): void {
   renderStrip();
   renderBlocks();
   renderReasons();
+  renderTranscript();
 }
 
 /* ---------- media ---------- */
@@ -542,18 +553,6 @@ function renderTicks(): void {
 }
 
 function updateBadges(): void {
-  const counts: Record<Tab, number> = {
-    media: state.assets.length,
-    edit: 0,
-    blocks: state.project.clips.length + state.project.texts.length,
-    score: score ? score.total : 0,
-  };
-  for (const tab of TABS) {
-    const badge = document.querySelector<HTMLElement>(`[data-badge="${tab}"]`);
-    if (!badge) continue;
-    badge.textContent = String(counts[tab]);
-    badge.hidden = counts[tab] === 0;
-  }
   scoreChip.hidden = !score;
   if (score) {
     $('scoreChipVal').textContent = String(score.total);
@@ -973,14 +972,6 @@ async function exportVideo(): Promise<void> {
 
 /* ---------- tabs ---------- */
 
-function setTab(tab: Tab, pushHash = true): void {
-  document.body.dataset.tab = tab;
-  for (const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-goto]'))) {
-    btn.setAttribute('aria-selected', String(btn.dataset.goto === tab));
-  }
-  if (pushHash && location.hash !== `#${tab}`) history.replaceState(null, '', `#${tab}`);
-}
-
 /* ---------- events ---------- */
 
 $('pick').addEventListener('click', () => $<HTMLInputElement>('file').click());
@@ -1108,7 +1099,6 @@ $('rebuild').addEventListener('click', () => rebuild());
 analyzeBtn.addEventListener('click', () => void analyze());
 exportBtn.addEventListener('click', () => void exportVideo());
 scoreChip.addEventListener('click', () => {
-  setTab('score');
   $('panel-score').scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
@@ -1185,23 +1175,6 @@ $<HTMLSelectElement>('lang').addEventListener('change', (e) => {
   if (state.audio) renderAudio();
 });
 
-document.querySelectorAll<HTMLButtonElement>('[data-goto]').forEach((btn, i, all) => {
-  btn.addEventListener('click', () => setTab(btn.dataset.goto as Tab));
-  btn.addEventListener('keydown', (e) => {
-    const dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-    if (!dir) return;
-    e.preventDefault();
-    const next = all[(i + dir + all.length) % all.length]!;
-    next.focus();
-    setTab(next.dataset.goto as Tab);
-  });
-});
-
-window.addEventListener('hashchange', () => {
-  const tab = location.hash.slice(1) as Tab;
-  if (TABS.includes(tab)) setTab(tab, false);
-});
-
 /** Keeps the sticky stage docked right under the header, whatever height it currently has. */
 function syncHeaderHeight(): void {
   const h = $('topbar').getBoundingClientRect().height;
@@ -1241,6 +1214,45 @@ window.addEventListener('keydown', (e) => {
 });
 
 
+
+
+/* ---------- transcript panel ---------- */
+
+function stamp(seconds: number, srt = false): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const sec = Math.floor(seconds % 60);
+  const ms = Math.round((seconds % 1) * 1000);
+  const base = `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  if (!srt) return h ? `${h}:${base}` : base;
+  return `${String(h).padStart(2, '0')}:${base},${String(ms).padStart(3, '0')}`;
+}
+
+function renderTranscript(): void {
+  const box = $('transcript');
+  $('transcriptActions').hidden = cues.length === 0;
+  if (!cues.length) {
+    box.innerHTML = `<p class="empty-note">${t('tr.empty')}</p>`;
+    return;
+  }
+  box.innerHTML = `<ol class="cues">${cues
+    .map(
+      (c, i) => `<li><button data-cue="${i}"><span class="cues__time">${stamp(c.start)}</span><span>${c.text
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')}</span></button></li>`,
+    )
+    .join('')}</ol>`;
+}
+
+function toSrt(list: Cue[]): string {
+  return list
+    .map((c, i) => `${i + 1}\n${stamp(c.start, true)} --> ${stamp(c.end, true)}\n${c.text}\n`)
+    .join('\n');
+}
+
+function downloadText(text: string, filename: string, type = 'text/plain'): void {
+  downloadBlob(new Blob([text], { type: `${type};charset=utf-8` }), filename);
+}
 
 /* ---------- link import and transcription ---------- */
 
@@ -1320,10 +1332,10 @@ async function runTranscription(): Promise<void> {
     });
     cues = splitCues(found);
     scriptInput.value = found.map((c) => c.text).join(' ');
-    $('applyCues').hidden = cues.length === 0;
+    renderTranscript();
     label.textContent = `${cues.length} ${t('asr.blocks')}`;
-    if (cues.length) applyCues();
-    else toast(t('asr.empty'));
+    if (!cues.length) toast(t('asr.empty'));
+    else if (totalDuration(state.project) > 0.2) applyCues();
   } catch (err) {
     label.textContent = t('asr.failed');
     toast(String(err instanceof Error ? err.message : err).slice(0, 120));
@@ -1468,12 +1480,6 @@ function enhanceFromUI(): void {
 
 async function setMode(mode: ReelMode): Promise<void> {
   document.body.dataset.mode = mode;
-  for (const btn of Array.from(document.querySelectorAll<HTMLElement>('[data-mode]'))) {
-    btn.setAttribute('aria-pressed', String(btn.dataset.mode === mode));
-  }
-  $('entertainBox').hidden = mode !== 'viral';
-  $('multiBox').hidden = mode !== 'multi';
-  $('modeHint').textContent = t(`mode.${mode}.hint`);
 
   if (mode === 'build') {
     state.project.enhance = idleEnhance();
@@ -1484,13 +1490,30 @@ async function setMode(mode: ReelMode): Promise<void> {
   const video = state.assets.find((a) => a.kind === 'video');
   if (!video) {
     toast(t('entertain.needVideo'));
-    void setMode('build');
     return;
   }
 
   await analyseSource(video, mode);
   if (mode === 'viral') applyViral(video, 0, video.srcDuration || sourceAudio?.duration || 15);
   else renderHighlights();
+}
+
+/** Sections are the top-level navigation: each one shows only the panels it needs. */
+async function setSection(section: Section, remember = true): Promise<void> {
+  document.body.dataset.section = section;
+  for (const btn of Array.from(document.querySelectorAll<HTMLElement>('#sections [data-section]'))) {
+    btn.setAttribute('aria-selected', String(btn.dataset.section === section));
+  }
+  if (remember) {
+    localStorage.setItem('mai-reel-section', section);
+    if (location.hash.slice(1) !== section) history.replaceState(null, '', `#${section}`);
+  }
+  syncPreviewScale();
+
+  if (section === 'boost') await setMode('viral');
+  else if (section === 'multi') await setMode('multi');
+  else if (section === 'build') await setMode('build');
+  // the transcribe section does not touch the project: it only needs the media and Whisper
 }
 
 /** Decodes the video's own audio once: beats, loudness, voice activity and framing. */
@@ -1658,10 +1681,29 @@ $('packs').addEventListener('click', (e) => {
   if (btn) applyPack(btn.dataset.pack!);
 });
 $('auto').addEventListener('click', () => void autoEdit());
-$('modeSwitch').addEventListener('click', (e) => {
-  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-mode]');
-  if (btn) void setMode(btn.dataset.mode as ReelMode);
+$('sections').addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-section]');
+  if (btn) void setSection(btn.dataset.section as Section);
 });
+
+$('transcript').addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-cue]');
+  const cue = cues[Number(btn?.dataset.cue)];
+  if (!cue) return;
+  const offset = state.project.clips[0]?.srcIn ?? 0;
+  player.pause();
+  player.seek(Math.max(0, cue.start - offset));
+  updateTransport();
+});
+
+$('copyText').addEventListener('click', () => {
+  void navigator.clipboard
+    .writeText(cues.map((c) => c.text).join(' '))
+    .then(() => toast(t('tr.copied')))
+    .catch(() => toast(t('tr.copyFailed')));
+});
+$('downloadSrt').addEventListener('click', () => downloadText(toSrt(cues), 'mai-reel.srt', 'application/x-subrip'));
+$('downloadTxt').addEventListener('click', () => downloadText(cues.map((c) => c.text).join(' '), 'mai-reel.txt'));
 for (const id of ['enIntensity', 'enDrama', 'enShake', 'enFace', 'enProtect']) {
   $(id).addEventListener('input', enhanceFromUI);
 }
@@ -1700,30 +1742,19 @@ $('multiList').addEventListener('click', (e) => {
   toast(`${fmt(h.start)} → ${fmt(h.end)} · ${h.score}/100`);
 });
 
-$('viewToggle').addEventListener('click', () => {
-  const all = document.body.dataset.view !== 'all';
-  setView(all ? 'all' : 'tabs');
-});
-
-function setView(view: 'all' | 'tabs'): void {
-  document.body.dataset.view = view;
-  $('viewToggle').setAttribute('aria-pressed', String(view === 'all'));
-  localStorage.setItem('mai-reel-view', view);
-  syncPreviewScale();
-}
-
-
 /* ---------- boot ---------- */
 
-const initialTab = (location.hash.slice(1) as Tab) || 'media';
-setTab(TABS.includes(initialTab) ? initialTab : 'media', false);
+const hashed = location.hash.slice(1) as Section;
+const savedSection = localStorage.getItem('mai-reel-section') as Section | null;
+const firstSection: Section = SECTIONS.includes(hashed)
+  ? hashed
+  : savedSection && SECTIONS.includes(savedSection)
+    ? savedSection
+    : 'transcribe';
+
 document.body.dataset.mode = 'build';
-setView((localStorage.getItem('mai-reel-view') as 'all' | 'tabs') === 'all' ? 'all' : 'tabs');
-renderSeed();
-// the picker has to show the language that was restored from storage or the browser
 $<HTMLSelectElement>('lang').value = state.lang;
 $<HTMLSelectElement>('asrLang').value = state.lang;
-// on a wide screen there is room for everything, so these groups start open
 for (const id of ['settingsGroup', 'textsGroup']) {
   ($(id) as HTMLDetailsElement).open = wideScreen.matches;
 }
@@ -1736,7 +1767,13 @@ markPacks();
 renderAudio();
 rebuild();
 renderStrip();
+renderTranscript();
 updateTransport();
+void setSection(firstSection, false);
+window.addEventListener('hashchange', () => {
+  const next = location.hash.slice(1) as Section;
+  if (SECTIONS.includes(next) && next !== document.body.dataset.section) void setSection(next, false);
+});
 void ensureFontsLoaded().then(() => player.seek(state.time));
 
 // installable app: the service worker only runs from a built deploy, never from `vite dev`

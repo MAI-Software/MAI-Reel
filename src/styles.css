@@ -45,15 +45,13 @@ body {
 }
 
 body {
-  height: 100dvh;
-  overflow: hidden;
+  min-height: 100dvh;
 }
 
 #app {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
-  min-height: 0;
+  min-height: 100dvh;
 }
 
 button,
@@ -78,7 +76,8 @@ button {
 
 .topbar {
   flex: 0 0 auto;
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 40;
   transition: padding 180ms ease-out, box-shadow 180ms ease-out;
   display: flex;
@@ -126,8 +125,9 @@ button {
 
 .layout {
   flex: 1 1 auto;
-  min-height: 0;
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 12px;
   padding: 12px;
   max-width: 1600px;
@@ -143,28 +143,10 @@ button {
   overflow: hidden;
 }
 
-/* each panel owns its scroll, so the columns and the page never scroll
-   (double class keeps these above the generic `.panel` rule further down) */
-.panel.panel--edit,
-.panel.panel--blocks,
-.panel.panel--score {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.panel.panel--edit {
+/* every panel is a flexible card inside the section layout */
+.panel--blocks #blocks {
+  max-height: 460px;
   overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.panel--blocks #blocks,
-.panel--score #scoreBody {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 2px;
 }
 
 .panel {
@@ -175,7 +157,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  flex: 0 0 auto;
+  flex: 1 1 340px;
+  min-width: 0;
 }
 
 .panel__title {
@@ -191,17 +174,17 @@ button {
 .stage {
   order: -1;
   display: flex;
+  flex: 1 1 320px;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
   gap: 10px;
-  min-height: 0;
 }
 
 .viewport {
   position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
+  height: min(62vh, 560px);
   width: auto;
   max-width: 100%;
   margin-inline: auto;
@@ -385,7 +368,7 @@ button {
   background: rgba(236, 72, 153, 0.08);
 }
 
-.dropzone h2 {
+.dropzone h3 {
   margin: 0;
   font-size: 16px;
 }
@@ -1337,17 +1320,6 @@ body[data-mode='multi'] .panel--edit > .empty-note:last-child {
   height: 20px;
 }
 
-body[data-tab] .panel {
-  display: none;
-}
-
-body[data-tab='media'] .panel--media,
-body[data-tab='edit'] .panel--edit,
-body[data-tab='blocks'] .panel--blocks,
-body[data-tab='score'] .panel--score {
-  display: flex;
-}
-
 
 /* ---------- link import + transcription ---------- */
 
@@ -1409,6 +1381,142 @@ body[data-tab='score'] .panel--score {
 .clipcard__quote {
   color: var(--fg-dim);
   font-style: italic;
+}
+
+/* ---------- sections: the top level navigation ---------- */
+
+.sections {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.sections button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg-dim);
+  text-align: left;
+  transition: border-color 160ms ease-out, background 160ms ease-out, color 160ms ease-out;
+}
+
+.sections button:hover {
+  background: var(--surface-2);
+}
+
+.sections button[aria-selected='true'] {
+  border-color: var(--primary);
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+.sections button[aria-selected='true'] svg {
+  color: var(--primary);
+}
+
+.sections svg {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+}
+
+.sections span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.sections strong {
+  font-size: 14px;
+}
+
+.sections small {
+  font-size: 11px;
+  color: var(--fg-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* only the panels that belong to the active section are mounted */
+.panel--transcript,
+.panel--boost,
+.panel--multi,
+.panel--edit,
+.panel--blocks,
+.panel--score,
+.stage {
+  display: none;
+}
+
+body[data-section='transcribe'] .panel--media,
+body[data-section='transcribe'] .panel--transcript,
+body[data-section='boost'] .panel--media,
+body[data-section='boost'] .panel--boost,
+body[data-section='boost'] .panel--transcript,
+body[data-section='boost'] .stage,
+body[data-section='boost'] .panel--blocks,
+body[data-section='boost'] .panel--score,
+body[data-section='build'] .panel--media,
+body[data-section='build'] .panel--edit,
+body[data-section='build'] .panel--transcript,
+body[data-section='build'] .stage,
+body[data-section='build'] .panel--blocks,
+body[data-section='build'] .panel--score,
+body[data-section='multi'] .panel--media,
+body[data-section='multi'] .panel--multi,
+body[data-section='multi'] .panel--transcript,
+body[data-section='multi'] .stage,
+body[data-section='multi'] .panel--blocks,
+body[data-section='multi'] .panel--score {
+  display: flex;
+}
+
+.cues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.cues button {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--fg);
+  text-align: left;
+  font-size: 14px;
+}
+
+.cues button:hover {
+  background: #232b4d;
+}
+
+.cues__time {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--primary);
+  padding-top: 2px;
 }
 
 /* ---------- responsive overrides (kept last so they win by order) ---------- */
@@ -1814,5 +1922,45 @@ body[data-view='all'] .col {
 
   body[data-view='all'] .parent-link {
     display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  /* two rows of section cards instead of four cramped columns */
+  .sections {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 6px 8px;
+    position: sticky;
+    top: var(--header-h, 55px);
+    z-index: 35;
+  }
+
+  .sections button {
+    min-height: 48px;
+    padding: 6px 8px;
+  }
+
+  .sections small {
+    display: none;
+  }
+
+  .stage {
+    position: sticky;
+    top: calc(var(--header-h, 55px) + 118px);
+    z-index: 20;
+    background: var(--bg);
+  }
+
+  .viewport {
+    height: min(38dvh, 380px);
+  }
+
+  .panel {
+    flex: 1 1 100%;
+  }
+
+  .cues {
+    max-height: none;
   }
 }
