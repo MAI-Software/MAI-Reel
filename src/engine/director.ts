@@ -1,9 +1,11 @@
-import type { Effect, Grade, MediaAsset, Project, TemplateId, TextAnim } from '../types';
+import type { Grade, MediaAsset, Project, TemplateId, TextAnim } from '../types';
 import type { MediaStats } from '../analysis/frames';
 import { scoreProject } from '../analysis/score';
 import { buildProject, relayout, type BuildOptions } from './autoedit';
 import { t, tf } from '../i18n';
 import { makeRng, randomSeed, pick, pickSome, jitter } from './rng';
+import { composeShots, describeComposition } from './compose';
+import type { ShotProfile } from '../analysis/shot';
 
 export interface StylePack {
   id: string;
@@ -20,13 +22,13 @@ export const STYLE_PACKS: StylePack[] = [
   { id: 'vlog', template: 'flow', grade: 'none', fontId: 'poppins', styleId: 'box', anim: 'slide-up' },
   { id: 'cinema', template: 'story', grade: 'film', fontId: 'montserrat', styleId: 'clean', anim: 'fade' },
   { id: 'retro', template: 'punch', grade: 'vhs', fontId: 'archivo', styleId: 'sticker', anim: 'bounce' },
-  { id: 'neon', template: 'punch', grade: 'night', fontId: 'bebas', styleId: 'cyber', anim: 'pop' },
+  { id: 'neon', template: 'punch', grade: 'cyber', fontId: 'bebas', styleId: 'cyber', anim: 'pop' },
   { id: 'dream', template: 'flow', grade: 'dream', fontId: 'poppins', styleId: 'ghost', anim: 'fade' },
-  { id: 'sport', template: 'punch', grade: 'cool', fontId: 'archivo', styleId: 'alert', anim: 'bounce' },
-  { id: 'luxury', template: 'story', grade: 'warm', fontId: 'montserrat', styleId: 'gold', anim: 'fade' },
-  { id: 'doc', template: 'story', grade: 'mono', fontId: 'atkinson', styleId: 'contrast', anim: 'slide-up' },
+  { id: 'sport', template: 'punch', grade: 'punchy', fontId: 'archivo', styleId: 'alert', anim: 'bounce' },
+  { id: 'luxury', template: 'story', grade: 'golden', fontId: 'montserrat', styleId: 'gold', anim: 'fade' },
+  { id: 'doc', template: 'story', grade: 'silver', fontId: 'atkinson', styleId: 'contrast', anim: 'slide-up' },
   { id: 'karaoke', template: 'flow', grade: 'vivid', fontId: 'anton', styleId: 'lemon', anim: 'karaoke' },
-  { id: 'ocean', template: 'flow', grade: 'cool', fontId: 'poppins', styleId: 'ocean', anim: 'slide-up' },
+  { id: 'ocean', template: 'flow', grade: 'teal-orange', fontId: 'poppins', styleId: 'ocean', anim: 'slide-up' },
   { id: 'bold', template: 'punch', grade: 'vivid', fontId: 'bebas', styleId: 'shadow', anim: 'pop' },
 ];
 
@@ -51,6 +53,8 @@ export interface DirectorContext {
   assetRank?: Map<string, number>;
   /** Variation seed; omit for a fresh take every time. */
   seed?: number;
+  /** Per-shot content profiles: what makes the picks fit the footage. */
+  profiles?: Map<string, ShotProfile>;
 }
 
 /** A decision kept as data so it can be re-rendered when the UI language changes. */
@@ -135,18 +139,11 @@ function planFor(ctx: DirectorContext, seed: number): DirectorDecision {
   return { pack, target, reasons };
 }
 
-/** Effect chosen from each clip's own measurements. */
-function effectFor(asset: MediaAsset, sharp: number, motion: number, index: number, rng: () => number): Effect {
-  if (asset.kind === 'video') return motion > 0.25 ? 'none' : 'zoom-in';
-  // the measurement narrows the family, the roll picks inside it
-  if (sharp > 0.45) return pick(rng, ['punch', 'zoom-in', 'shake', 'pan-left'] as Effect[]);
-  if (sharp < 0.2) return pick(rng, ['drift', 'blur-in', 'zoom-out', 'pan-up'] as Effect[]);
-  return pick(rng, ['pan-left', 'pan-right', 'zoom-in', 'zoom-out', 'drift', 'rotate'] as Effect[]);
-}
-
 export interface DirectorResult {
   project: Project;
   seed: number;
+  /** What the shot analysis led to, in plain language. */
+  notes?: string[];
   decision: DirectorDecision;
   score: number;
   reasons: Reason[];
@@ -201,12 +198,18 @@ export function autoDirect(ctx: DirectorContext): DirectorResult | null {
       seed: (seed + pack.id.length * 7919) >>> 0,
     };
     const project = relayout(buildProject(ordered, opts));
-    project.clips.forEach((clip, i) => {
-      const stat = ctx.stats.perClip.find((c) => c.clipId === clip.id);
-      const asset = ctx.assets.find((a) => a.id === clip.assetId);
-      if (asset) clip.effect = effectFor(asset, stat?.stats.sharpness ?? 0.3, stat?.motion ?? 0, i, rng);
-      clip.grade = pack.grade;
-    });
+    if (ctx.profiles?.size) {
+      composeShots(project, {
+        profiles: ctx.profiles,
+        template: pack.template,
+        rng,
+        beats: ctx.beats,
+        // the pack proposes a look, but footage that clearly wants another one wins
+        grade: pack.grade === 'none' ? undefined : pack.grade,
+      });
+    } else {
+      for (const clip of project.clips) clip.grade = pack.grade;
+    }
 
     const result = scoreProject(project, ctx.stats);
     tried.push({ key: 'pack', packId: pack.id, score: result.total });
@@ -215,6 +218,11 @@ export function autoDirect(ctx: DirectorContext): DirectorResult | null {
     }
   }
 
-  if (best) best.reasons = [...plan.reasons, ...tried];
+  if (best) {
+    best.reasons = [...plan.reasons, ...tried];
+    if (ctx.profiles?.size) {
+      best.notes = describeComposition(best.project, ctx.profiles);
+    }
+  }
   return best;
 }

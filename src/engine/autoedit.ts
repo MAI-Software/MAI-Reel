@@ -2,6 +2,7 @@ import type { Aspect, Clip, Effect, Enhance, MediaAsset, Project, TemplateId, Te
 import { uid } from '../state';
 import { DEFAULT_FONT, DEFAULT_STYLE } from '../data/typography';
 import { makeRng, randomSeed, pick, jitter, type Rng } from './rng';
+import { EFFECTS, TRANSITIONS, type Energy } from '../data/effects';
 
 export interface TemplateSpec {
   id: TemplateId;
@@ -9,52 +10,39 @@ export interface TemplateSpec {
   maxClip: number;
   maxVideoClip: number;
   target: number;
-  transitions: Transition[];
-  effects: Effect[];
+  /** How punchy this template wants to feel; the banks are filtered by it. */
+  energy: Energy;
 }
 
 export const TEMPLATES: Record<TemplateId, TemplateSpec> = {
-  punch: {
-    id: 'punch',
-    minClip: 0.7,
-    maxClip: 1.4,
-    maxVideoClip: 4,
-    target: 12,
-    transitions: ['cut', 'flash', 'cut', 'whip'],
-    effects: ['punch', 'zoom-in', 'shake', 'zoom-out', 'pan-left', 'punch', 'pan-right'],
-  },
-  flow: {
-    id: 'flow',
-    minClip: 1.4,
-    maxClip: 2.4,
-    maxVideoClip: 6,
-    target: 15,
-    transitions: ['fade', 'slide', 'wipe', 'fade'],
-    effects: ['pan-right', 'zoom-in', 'drift', 'pan-left', 'zoom-out', 'pan-up'],
-  },
-  story: {
-    id: 'story',
-    minClip: 2.2,
-    maxClip: 3.4,
-    maxVideoClip: 8,
-    target: 20,
-    transitions: ['fade', 'push-up', 'fade'],
-    effects: ['zoom-in', 'blur-in', 'drift', 'rotate', 'zoom-out'],
-  },
+  punch: { id: 'punch', minClip: 0.7, maxClip: 1.4, maxVideoClip: 4, target: 12, energy: 2 },
+  flow: { id: 'flow', minClip: 1.4, maxClip: 2.4, maxVideoClip: 6, target: 15, energy: 1 },
+  story: { id: 'story', minClip: 2.2, maxClip: 3.4, maxVideoClip: 8, target: 20, energy: 0 },
 };
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-/** Effects and transitions are drawn from the template pool, never in a fixed rotation. */
+/**
+ * First pass over the banks, filtered by the template's energy. `composeShots` refines this
+ * per shot once the footage has been analysed; this is what a build without analysis gets.
+ */
 function rollEffect(rng: Rng, spec: TemplateSpec, isVideo: boolean): Effect {
-  if (isVideo) return rng() < 0.55 ? 'none' : 'zoom-in';
-  return pick(rng, spec.effects);
+  const pool = EFFECTS.filter(
+    (e) =>
+      e.id !== 'none' &&
+      Math.abs(e.energy - spec.energy) <= 1 &&
+      (isVideo ? e.suits !== 'still' : e.suits !== 'video'),
+  );
+  if (isVideo && rng() < 0.4) return 'none';
+  return pool.length ? pick(rng, pool).id : 'zoom-in';
 }
 
 function rollTransition(rng: Rng, spec: TemplateSpec, index: number): Transition {
   if (index === 0) return 'cut';
   // a hard cut now and then keeps a run of transitions from feeling mechanical
-  return rng() < 0.25 ? 'cut' : pick(rng, spec.transitions);
+  if (rng() < 0.3) return 'cut';
+  const pool = TRANSITIONS.filter((t) => t.id !== 'cut' && Math.abs(t.energy - spec.energy) <= 1);
+  return pool.length ? pick(rng, pool).id : 'fade';
 }
 
 export interface BuildOptions {
@@ -313,6 +301,8 @@ export function buildCaptions(
 /** Adds new media at the end of an existing timeline without discarding manual edits. */
 export function appendAssets(project: Project, assets: MediaAsset[]): Project {
   const spec = TEMPLATES[project.template];
+  // a fresh roll so appended shots do not all get the same treatment
+  const appendRng = makeRng(randomSeed());
   let cursor = project.clips.reduce((a, c) => a + c.duration, 0);
   assets.forEach((asset, i) => {
     const idx = project.clips.length;
@@ -326,8 +316,8 @@ export function appendAssets(project: Project, assets: MediaAsset[]): Project {
       start: cursor,
       duration,
       srcIn: 0,
-      effect: asset.kind === 'video' ? 'none' : spec.effects[(idx + i) % spec.effects.length]!,
-      transition: idx === 0 ? 'cut' : spec.transitions[(idx + i) % spec.transitions.length]!,
+      effect: rollEffect(appendRng, spec, asset.kind === 'video'),
+      transition: rollTransition(appendRng, spec, idx),
       grade: project.clips[project.clips.length - 1]?.grade ?? 'none',
     });
     cursor += duration;

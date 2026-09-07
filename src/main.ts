@@ -10,10 +10,13 @@ import { recordCanvas, downloadBlob, extensionFor, pickMime } from './engine/exp
 import { analyzeMedia, type MediaStats } from './analysis/frames';
 import { scoreProject, type ScoreResult } from './analysis/score';
 import { FONTS, TEXT_STYLES, ensureFontsLoaded } from './data/typography';
+import { EFFECTS, TRANSITIONS, GRADES } from './data/effects';
+import { profileAssets, type ShotProfile } from './analysis/shot';
+import { composeShots, describeComposition } from './engine/compose';
 import { loadAudioFile, beatsInFragment, drawWaveform, analyzeFileAudio, type SourceAudio } from './engine/audio';
 import { detectVoice, timeBlocksToSpeech, type VoiceMap } from './analysis/voice';
 import { findHighlights, type Highlight } from './analysis/highlights';
-import { randomSeed, seedCode } from './engine/rng';
+import { randomSeed, seedCode, makeRng } from './engine/rng';
 import { transcribeFile, splitCues, isTranscriptionSupported, type Cue } from './analysis/transcribe';
 import { fetchMediaFromUrl, LinkError, platformOf } from './engine/fetchMedia';
 import { embedFor, type EmbedInfo } from './engine/embed';
@@ -34,23 +37,7 @@ import type { Aspect, Effect, Enhance, Grade, MediaAsset, ReelMode, TemplateId, 
 
 const PARENT_SITE = 'https://mai-softwares.com';
 const REPO = 'https://github.com/MAI-Software/MAI-Reel';
-const EFFECTS: Effect[] = [
-  'none',
-  'zoom-in',
-  'zoom-out',
-  'pan-left',
-  'pan-right',
-  'pan-up',
-  'pan-down',
-  'punch',
-  'shake',
-  'rotate',
-  'blur-in',
-  'drift',
-];
-const TRANSITIONS: Transition[] = ['cut', 'fade', 'zoom', 'slide', 'whip', 'flash', 'push-up', 'wipe'];
 const ANIMS: TextAnim[] = ['fade', 'pop', 'slide-up', 'bounce', 'typewriter', 'karaoke', 'none'];
-const GRADES: Grade[] = ['none', 'vivid', 'warm', 'cool', 'mono', 'film', 'vhs', 'dream', 'night'];
 const LENGTH_PRESETS = [8, 12, 15, 20];
 const MIN_DURATION = 8;
 const POSITIONS: Array<{ id: string; y: number }> = [
@@ -66,9 +53,10 @@ const AUTO_ANALYZE_MAX_CLIPS = 24;
 
 const app = document.getElementById('app')!;
 
-const options = (values: string[], selected: string, labelKey: (v: string) => string) =>
-  values
-    .map((v) => `<option value="${v}" ${v === selected ? 'selected' : ''}>${t(labelKey(v))}</option>`)
+/** Options straight from a bank definition, which already carries its own label. */
+const bankOptions = (bank: Array<{ id: string; label: string }>, selected: string) =>
+  bank
+    .map((d) => `<option value="${d.id}" ${d.id === selected ? 'selected' : ''}>${d.label}</option>`)
     .join('');
 
 const SECTIONS = ['transcribe', 'boost', 'build', 'multi'] as const;
@@ -442,7 +430,10 @@ let exporting = false;
 let analyzeTimer = 0;
 let lastPlaying: boolean | null = null;
 let lastStats: MediaStats | null = null;
+let profiles = new Map<string, ShotProfile>();
+let profiledIds = '';
 let lastReasons: Reason[] = [];
+let lastNotes: string[] = [];
 let sourceAudio: SourceAudio | null = null;
 let voice: VoiceMap | null = null;
 let highlights: Highlight[] = [];
@@ -494,6 +485,7 @@ async function addFiles(files: File[]): Promise<void> {
   if (!added.length) return;
 
   const hadClips = state.project.clips.length > 0;
+  profiledIds = '';
   capturedAudio = null;
   state.assets.push(...added);
   if (hadClips) {
@@ -670,13 +662,13 @@ function clipCard(index: number): string {
     </div>
     <div class="block__grid">
       <label>${t('clip.effect')}
-        <select data-field="effect">${options(EFFECTS, clip.effect, (v) => `effect.${v}`)}</select>
+        <select data-field="effect">${bankOptions(EFFECTS, clip.effect)}</select>
       </label>
       <label>${t('clip.transition')}
-        <select data-field="transition">${options(TRANSITIONS, clip.transition, (v) => `trans.${v}`)}</select>
+        <select data-field="transition">${bankOptions(TRANSITIONS, clip.transition)}</select>
       </label>
       <label>${t('clip.grade')}
-        <select data-field="grade">${options(GRADES, clip.grade ?? 'none', (v) => `grade.${v}`)}</select>
+        <select data-field="grade">${bankOptions(GRADES, clip.grade ?? 'none')}</select>
       </label>
     </div>
     <button class="btn btn--sm btn--ghost" data-addtext="${clip.id}">${icons.captions}<span>${t('block.addText')}</span></button>
@@ -1148,7 +1140,10 @@ $('captions').addEventListener('click', () => {
   toast(`${captions.length} ${t('toast.captions')}`);
 });
 
-$('rebuild').addEventListener('click', () => rebuild());
+$('rebuild').addEventListener('click', () => {
+  rebuild();
+  void recompose();
+});
 analyzeBtn.addEventListener('click', () => void analyze());
 exportBtn.addEventListener('click', () => void exportVideo());
 scoreChip.addEventListener('click', () => {
@@ -1346,6 +1341,33 @@ async function captureWholeVideo(): Promise<void> {
       void stopCapture();
     }
   }, 500);
+}
+
+
+/** Analyses each imported asset once; the result drives every later composition. */
+async function ensureProfiles(): Promise<Map<string, ShotProfile>> {
+  const key = state.assets.map((a) => a.id).join(',');
+  if (key === profiledIds && profiles.size) return profiles;
+  profiles = await profileAssets(state.assets);
+  profiledIds = key;
+  return profiles;
+}
+
+/** Re-picks moves, entrances and look for the current timeline from the shot profiles. */
+async function recompose(): Promise<void> {
+  if (!state.assets.length || !state.project.clips.length) return;
+  const map = await ensureProfiles();
+  if (!map.size) return;
+  composeShots(state.project, {
+    profiles: map,
+    template: state.project.template,
+    rng: makeRng(state.project.seed || randomSeed()),
+    beats: currentBeats(),
+  });
+  lastNotes = describeComposition(state.project, map);
+  touch();
+  renderBlocks();
+  renderReasons();
 }
 
 /* ---------- extractor service: paste a link, get the transcript ---------- */
@@ -1745,9 +1767,8 @@ function renderSeed(): void {
 }
 
 function renderReasons(): void {
-  $('autoWhy').textContent = lastReasons.length
-    ? lastReasons.map(formatReason).join(' · ')
-    : t('action.autoHint');
+  const parts = [...lastReasons.map(formatReason), ...lastNotes];
+  $('autoWhy').textContent = parts.length ? parts.join(' · ') : t('action.autoHint');
 }
 
 function markPacks(): void {
@@ -1764,6 +1785,7 @@ async function autoEdit(): Promise<void> {
   try {
     const stats = await analyzeMedia(state.project, assetById);
     lastStats = stats;
+    const shotProfiles = await ensureProfiles();
     const assetRank = new Map<string, number>();
     for (const clip of state.project.clips) {
       const stat = stats.perClip.find((c) => c.clipId === clip.id);
@@ -1774,6 +1796,7 @@ async function autoEdit(): Promise<void> {
     const result = autoDirect({
       assets: state.assets,
       stats,
+      profiles: shotProfiles,
       assetRank,
       bpm: state.audio?.bpm,
       beats: currentBeats(),
@@ -1796,6 +1819,7 @@ async function autoEdit(): Promise<void> {
     score = scoreProject(state.project, stats);
     scoreStale = false;
     lastReasons = result.reasons;
+    lastNotes = result.notes ?? [];
     renderReasons();
     player.seek(0);
     updateTransport();
@@ -2063,7 +2087,7 @@ for (const id of ['enIntensity', 'enDrama', 'enShake', 'enFace', 'enProtect']) {
 
 $('variant').addEventListener('click', () => {
   rebuild();
-  void analyze();
+  void recompose().then(() => analyze());
   toast(`#${seedCode(state.project.seed)}`);
 });
 $('viralCaptions').addEventListener('click', viralCaptions);

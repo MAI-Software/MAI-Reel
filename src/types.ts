@@ -14,26 +14,12 @@ export interface MediaAsset {
   file?: File;
 }
 
-export type Effect =
-  | 'none'
-  | 'zoom-in'
-  | 'zoom-out'
-  | 'pan-left'
-  | 'pan-right'
-  | 'pan-up'
-  | 'pan-down'
-  | 'punch'
-  | 'shake'
-  | 'rotate'
-  | 'blur-in'
-  | 'drift';
-
-export type Transition = 'cut' | 'fade' | 'zoom' | 'slide' | 'whip' | 'flash' | 'push-up' | 'wipe';
+/** Ids from the effect / transition / grade banks in `data/effects.ts`. */
+export type Effect = string;
+export type Transition = string;
+export type Grade = string;
 
 export type TextAnim = 'none' | 'fade' | 'pop' | 'slide-up' | 'typewriter' | 'karaoke' | 'bounce';
-
-/** Colour look applied to a clip. */
-export type Grade = 'none' | 'vivid' | 'warm' | 'cool' | 'mono' | 'film' | 'vhs' | 'dream' | 'night';
 
 export type ReelMode = 'viral' | 'build' | 'multi';
 export type TemplateId = 'punch' | 'flow' | 'story';
