@@ -72,9 +72,9 @@ const SECTION_ICON: Record<Section, string> = {
 function shell(): string {
   return `
   <header class="topbar" id="topbar">
-    <a class="brand" href="${PARENT_SITE}" target="_blank" rel="noopener noreferrer" title="MAI Softwares">
+    <div class="brand">
       ${brandMark}<span class="brand__name">MAI<span>-Reel</span></span>
-    </a>
+    </div>
     <span class="topbar__tag" data-i18n="app.tagline"></span>
     <span class="topbar__spacer"></span>
     <button class="chip chip--score" id="scoreChip" hidden>
