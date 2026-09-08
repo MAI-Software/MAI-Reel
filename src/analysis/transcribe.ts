@@ -1,7 +1,15 @@
+export interface CueWord {
+  start: number;
+  end: number;
+  text: string;
+}
+
 export interface Cue {
   start: number;
   end: number;
   text: string;
+  /** Per-word times, when Whisper managed to align them. */
+  words?: CueWord[];
 }
 
 export interface TranscribeProgress {
@@ -115,32 +123,88 @@ export async function transcribeFile(file: Blob, opts: TranscribeOptions = {}): 
   opts.onProgress?.({ stage: 'run', progress: 0.15 });
 
   const language = opts.language && opts.language !== 'auto' ? opts.language : undefined;
-  const output = await pipe(audio, {
-    return_timestamps: true,
+  const base = {
     chunk_length_s: 30,
     stride_length_s: 5,
     task: 'transcribe',
     ...(language ? { language } : {}),
-  });
+  };
+
+  // word timestamps drive the word-by-word captions; not every build aligns them, so a
+  // failure falls back to the sentence-level run instead of losing the transcription
+  let output: TranscriptionOutput;
+  let wordLevel = true;
+  try {
+    output = await pipe(audio, { ...base, return_timestamps: 'word' });
+    if (!output.chunks?.length) throw new Error('no word chunks');
+  } catch {
+    wordLevel = false;
+    output = await pipe(audio, { ...base, return_timestamps: true });
+  }
 
   opts.onProgress?.({ stage: 'run', progress: 1 });
   const total = audio.length / SAMPLE_RATE;
   const chunks = output.chunks ?? [];
-  const cues: Cue[] = [];
+  const cues: Cue[] = wordLevel ? cuesFromWords(chunks, total) : [];
 
-  for (const chunk of chunks) {
-    const text = (chunk.text ?? '').trim();
-    if (!isSpeech(text)) continue;
-    const start = chunk.timestamp?.[0] ?? cues[cues.length - 1]?.end ?? 0;
-    const end = chunk.timestamp?.[1] ?? Math.min(total, start + 2);
-    cues.push({ start, end: Math.max(start + 0.4, end), text });
-  }
+  if (!wordLevel)
+    for (const chunk of chunks) {
+      const text = (chunk.text ?? '').trim();
+      if (!isSpeech(text)) continue;
+      const start = chunk.timestamp?.[0] ?? cues[cues.length - 1]?.end ?? 0;
+      const end = chunk.timestamp?.[1] ?? Math.min(total, start + 2);
+      cues.push({ start, end: Math.max(start + 0.4, end), text });
+    }
 
   if (!cues.length && output.text && isSpeech(output.text)) {
     cues.push({ start: 0, end: total, text: output.text.trim() });
   }
   return cues;
 }
+
+/** Groups Whisper's word chunks into caption blocks that still know when each word is said. */
+export function cuesFromWords(chunks: TranscriptionOutput['chunks'] = [], total: number): Cue[] {
+  const words: CueWord[] = [];
+  let cursor = 0;
+  for (const chunk of chunks) {
+    const text = (chunk.text ?? '').trim();
+    if (!text) continue;
+    const start = chunk.timestamp?.[0] ?? cursor;
+    const end = chunk.timestamp?.[1] ?? Math.min(total, start + 0.4);
+    cursor = end;
+    words.push({ start, end: Math.max(start + 0.08, end), text });
+  }
+  if (!words.length) return [];
+
+  const cues: Cue[] = [];
+  let block: CueWord[] = [];
+  const flush = (): void => {
+    if (!block.length) return;
+    const text = block.map((w) => w.text).join(' ').replace(/\s+([,.!?;:])/g, '$1').trim();
+    if (isSpeech(text)) {
+      cues.push({
+        start: block[0]!.start,
+        end: Math.max(block[0]!.start + 0.4, block[block.length - 1]!.end),
+        text,
+        words: block.map((w) => ({ ...w })),
+      });
+    }
+    block = [];
+  };
+
+  for (const word of words) {
+    const prev = block[block.length - 1];
+    const line = [...block, word].map((w) => w.text).join(' ');
+    // a real pause or a full stop ends the block, and no block outgrows a phone screen
+    const pause = prev ? word.start - prev.end : 0;
+    if (block.length && (line.length > MAX_CAPTION_CHARS || pause > 0.6 || /[.!?]$/.test(prev?.text ?? ''))) flush();
+    block.push(word);
+  }
+  flush();
+  return cues;
+}
+
+const MAX_CAPTION_CHARS = 34;
 
 /** Splits long cues so no caption block is too wide to read on a phone. */
 export function splitCues(cues: Cue[], maxChars = 34): Cue[] {
@@ -161,7 +225,10 @@ export function splitCues(cues: Cue[], maxChars = 34): Cue[] {
     blocks.forEach((text, i) => {
       const share = (chars[i]! / totalChars) * span;
       const end = i === blocks.length - 1 ? cue.end : cursor + share;
-      out.push({ start: cursor, end: Math.max(cursor + 0.35, end), text });
+      const from = cursor;
+      const to = Math.max(cursor + 0.35, end);
+      const words = cue.words?.filter((w) => w.end > from && w.start < to);
+      out.push({ start: from, end: to, text, ...(words?.length ? { words } : {}) });
       cursor = end;
     });
   }

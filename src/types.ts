@@ -37,6 +37,13 @@ export interface Clip {
   grade: Grade;
 }
 
+/** One spoken word with the time it is said, used for word-by-word captions. */
+export interface WordTiming {
+  start: number;
+  end: number;
+  text: string;
+}
+
 export interface TextOverlay {
   id: string;
   text: string;
@@ -48,6 +55,8 @@ export interface TextOverlay {
   fontId: string;
   styleId: string;
   anim: TextAnim;
+  /** Timeline-relative word times from the transcription, when there are any. */
+  words?: WordTiming[];
 }
 
 /** Subtle audio-reactive camera motion used by the entertainment mode. */

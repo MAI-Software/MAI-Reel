@@ -6,6 +6,7 @@ import { t, tf } from '../i18n';
 import { makeRng, randomSeed, pick, pickSome, jitter } from './rng';
 import { composeShots, describeComposition } from './compose';
 import type { ShotProfile } from '../analysis/shot';
+import type { SourceSegment } from './segment';
 
 export interface StylePack {
   id: string;
@@ -55,6 +56,8 @@ export interface DirectorContext {
   seed?: number;
   /** Per-shot content profiles: what makes the picks fit the footage. */
   profiles?: Map<string, ShotProfile>;
+  /** assetId -> pieces of that video worth cutting to. */
+  segments?: Map<string, SourceSegment[]>;
 }
 
 /** A decision kept as data so it can be re-rendered when the UI language changes. */
@@ -195,6 +198,7 @@ export function autoDirect(ctx: DirectorContext): DirectorResult | null {
       styleId: pack.styleId,
       anim: pack.anim,
       beats: ctx.beats,
+      segments: ctx.segments,
       seed: (seed + pack.id.length * 7919) >>> 0,
     };
     const project = relayout(buildProject(ordered, opts));

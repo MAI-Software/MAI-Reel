@@ -12,6 +12,7 @@ import { scoreProject, type ScoreResult } from './analysis/score';
 import { FONTS, TEXT_STYLES, ensureFontsLoaded } from './data/typography';
 import { EFFECTS, TRANSITIONS, GRADES } from './data/effects';
 import { profileAssets, type ShotProfile } from './analysis/shot';
+import { planSegments, type SourceSegment } from './engine/segment';
 import { composeShots, describeComposition } from './engine/compose';
 import { loadAudioFile, beatsInFragment, drawWaveform, analyzeFileAudio, type SourceAudio } from './engine/audio';
 import { detectVoice, timeBlocksToSpeech, type VoiceMap } from './analysis/voice';
@@ -538,10 +539,41 @@ function currentBeats(): number[] | undefined {
   return beats.length > 3 ? beats : undefined;
 }
 
-function rebuild(seed?: number): void {
+/** assetId -> the pieces of that video worth cutting to; measured once per import. */
+const segmentCache = new Map<string, SourceSegment[]>();
+
+/**
+ * Splits every imported video into shots before an edit is built. Without this a video is one
+ * long take and the whole effect bank has nothing to cut between.
+ */
+async function ensureSegments(): Promise<Map<string, SourceSegment[]>> {
+  const out = new Map<string, SourceSegment[]>();
+  for (const asset of state.assets) {
+    if (asset.kind !== 'video' || !asset.srcDuration) continue;
+    let segments = segmentCache.get(asset.id);
+    if (!segments) {
+      const audio = asset.file ? await analyzeFileAudio(asset.file).catch(() => null) : null;
+      const voice = audio ? detectVoice(audio) : null;
+      segments = planSegments({
+        duration: asset.srcDuration,
+        want: 10,
+        minLen: 0.9,
+        maxLen: 5,
+        voice,
+        audio,
+      });
+      segmentCache.set(asset.id, segments);
+    }
+    out.set(asset.id, segments);
+  }
+  return out;
+}
+
+function rebuild(seed?: number, segments?: Map<string, SourceSegment[]>): void {
   const aspect = aspectSel.value as Aspect;
   state.project = buildProject(state.assets, {
     seed: seed ?? randomSeed(),
+    segments,
     beats: currentBeats(),
     template: templateSel.value as TemplateId,
     aspect,
@@ -1083,6 +1115,7 @@ strip.addEventListener('click', (e) => {
 $('clear').addEventListener('click', () => {
   for (const a of state.assets) URL.revokeObjectURL(a.url);
   state.assets = [];
+  segmentCache.clear();
   score = null;
   cues = [];
   capturedAudio = null;
@@ -1172,8 +1205,10 @@ $('captions').addEventListener('click', () => {
 });
 
 $('rebuild').addEventListener('click', () => {
-  rebuild();
-  void recompose();
+  void ensureSegments().then((segments) => {
+    rebuild(undefined, segments);
+    void recompose();
+  });
 });
 analyzeBtn.addEventListener('click', () => void analyze());
 exportBtn.addEventListener('click', () => void exportVideo());
@@ -1742,6 +1777,23 @@ async function runTranscription(): Promise<void> {
 }
 
 /** Writes the transcript onto the timeline with its real timings, trimmed to the current clip. */
+/**
+ * Source time -> timeline time. With one long take this was a subtraction; now that a video is
+ * cut into several shots (and silences are dropped) a caption has to be placed on the shot that
+ * actually contains the moment it was said, or dropped if that moment was cut out.
+ */
+function toTimeline(assetId: string, from: number, to: number): { start: number; end: number } | null {
+  for (const clip of state.project.clips) {
+    if (clip.assetId !== assetId) continue;
+    const clipEnd = clip.srcIn + clip.duration;
+    if (to <= clip.srcIn || from >= clipEnd) continue;
+    const start = clip.start + Math.max(0, from - clip.srcIn);
+    const end = clip.start + Math.min(clip.duration, Math.max(0.2, to - clip.srcIn));
+    return { start, end: Math.max(start + 0.25, end) };
+  }
+  return null;
+}
+
 function applyCues(): void {
   if (!cues.length) return;
   const duration = totalDuration(state.project);
@@ -1750,25 +1802,35 @@ function applyCues(): void {
     toast(t('asr.needMedia'));
     return;
   }
-  const offset = state.project.clips[0]?.srcIn ?? 0;
+  const spoken = transcribeSource();
+  const fromAssets = spoken && 'id' in spoken ? (spoken.id as string) : undefined;
+  const assetId =
+    fromAssets ?? state.assets.find((a) => a.kind === 'video')?.id ?? state.project.clips[0]?.assetId ?? '';
   state.project.texts = state.project.texts.filter((x) => x.role !== 'caption');
 
   let added = 0;
   for (const cue of cues) {
-    const start = cue.start - offset;
-    const end = cue.end - offset;
-    if (end <= 0.05 || start >= duration) continue;
+    const span = toTimeline(assetId, cue.start, cue.end);
+    if (!span || span.start >= duration) continue;
+    const words = cue.words
+      ?.map((w) => {
+        const at = toTimeline(assetId, w.start, w.end);
+        return at ? { start: at.start, end: at.end, text: w.text } : null;
+      })
+      .filter((w): w is { start: number; end: number; text: string } => Boolean(w));
     state.project.texts.push({
       id: uid('t'),
       text: cue.text,
-      start: Math.max(0, start),
-      end: Math.min(duration, Math.max(start + 0.4, end)),
+      start: Math.max(0, span.start),
+      end: Math.min(duration, span.end),
       role: 'caption',
       y: 0.74,
       size: 56,
       fontId: fontSel.value,
       styleId: styleSel.value,
-      anim: 'pop',
+      // real word times turn the block into a word-by-word caption
+      anim: words?.length ? 'karaoke' : 'pop',
+      ...(words?.length ? { words } : {}),
     });
     added++;
   }
@@ -1818,6 +1880,7 @@ async function autoEdit(): Promise<void> {
     const stats = await analyzeMedia(state.project, assetById);
     lastStats = stats;
     const shotProfiles = await ensureProfiles();
+    const segments = await ensureSegments();
     const assetRank = new Map<string, number>();
     for (const clip of state.project.clips) {
       const stat = stats.perClip.find((c) => c.clipId === clip.id);
@@ -1829,6 +1892,7 @@ async function autoEdit(): Promise<void> {
       assets: state.assets,
       stats,
       profiles: shotProfiles,
+      segments,
       assetRank,
       bpm: state.audio?.bpm,
       beats: currentBeats(),
@@ -2196,6 +2260,9 @@ window.addEventListener('hashchange', () => {
   const next = location.hash.slice(1) as Section;
   if (SECTIONS.includes(next) && next !== document.body.dataset.section) void setSection(next, false);
 });
+// dev-only handle so the timeline can be inspected from the console while iterating
+if (import.meta.env.DEV) (window as unknown as { maiReel: unknown }).maiReel = { state, get project() { return state.project; } };
+
 void ensureFontsLoaded().then(() => player.seek(state.time));
 
 // installable app: the service worker only runs from a built deploy, never from `vite dev`

@@ -382,7 +382,7 @@ export class ReelRenderer {
     lines.forEach((line, i) => {
       const y = top + lh * i + lh / 2;
       if (anim === 'karaoke') {
-        this.drawKaraokeLine(line, full, y, size, style, clamp01(local / life));
+        this.drawKaraokeLine(line, full, y, size, style, clamp01(local / life), o, t);
         return;
       }
       if (style.stroke) {
@@ -421,12 +421,19 @@ export class ReelRenderer {
     size: number,
     style: ReturnType<typeof styleById>,
     progress: number,
+    overlay?: TextOverlay,
+    t = 0,
   ): void {
     const { ctx } = this;
     const dw = this.canvas.width;
     const words = line.split(' ');
     const totalWords = full.split(/\s+/).filter(Boolean).length || words.length;
-    const spokenWords = progress * totalWords;
+    // real transcription times when they exist; otherwise the block is filled at a steady rate
+    const timings = overlay?.words;
+    const spokenWords = timings?.length
+      ? timings.filter((w) => w.start <= t).length
+      : progress * totalWords;
+    const currentWord = timings?.length ? timings.findIndex((w) => w.start <= t && w.end > t) : -1;
     const lineWidth = ctx.measureText(line).width;
     let x = (dw - lineWidth) / 2;
     const spaceW = ctx.measureText(' ').width;
@@ -435,14 +442,16 @@ export class ReelRenderer {
     ctx.textAlign = 'left';
     words.forEach((word, i) => {
       const w = ctx.measureText(word).width;
-      const done = startIndex + i < spokenWords;
+      const index = startIndex + i;
+      const done = index < spokenWords;
+      const speaking = index === currentWord;
       if (style.stroke) {
         ctx.lineWidth = size * (style.strokeWidth ?? 0.14);
         ctx.strokeStyle = style.stroke;
         ctx.lineJoin = 'round';
         ctx.strokeText(word, x, y);
       }
-      ctx.fillStyle = done ? '#EC4899' : style.fill;
+      ctx.fillStyle = speaking ? '#FFD166' : done ? '#EC4899' : style.fill;
       ctx.fillText(word, x, y);
       x += w + spaceW;
     });
