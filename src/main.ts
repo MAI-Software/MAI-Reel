@@ -13,6 +13,7 @@ import { FONTS, TEXT_STYLES, ensureFontsLoaded } from './data/typography';
 import { EFFECTS, TRANSITIONS, GRADES } from './data/effects';
 import { profileAssets, type ShotProfile } from './analysis/shot';
 import { planSegments, type SourceSegment } from './engine/segment';
+import { clearSession, isStorageAvailable, putFile, pruneFiles, readFiles, readSession, saveSession } from './engine/store';
 import { composeShots, describeComposition } from './engine/compose';
 import { loadAudioFile, beatsInFragment, drawWaveform, analyzeFileAudio, type SourceAudio } from './engine/audio';
 import { detectVoice, timeBlocksToSpeech, type VoiceMap } from './analysis/voice';
@@ -34,7 +35,7 @@ import {
 import { STYLE_PACKS, packById, autoDirect, formatReason, type Reason } from './engine/director';
 import { buildEntertainProject, idleEnhance } from './engine/autoedit';
 import { detectFocus } from './analysis/focus';
-import type { Aspect, Effect, Enhance, Grade, MediaAsset, ReelMode, TemplateId, TextAnim, TextOverlay, Transition } from './types';
+import type { Aspect, Effect, Enhance, Grade, MediaAsset, ReelMode, TemplateId, TextAnim, TextOverlay, Transition, Project } from './types';
 
 const PARENT_SITE = 'https://mai-softwares.com';
 const REPO = 'https://github.com/MAI-Software/MAI-Reel';
@@ -102,12 +103,16 @@ function shell(): string {
         </button>`,
       ).join('')}
     </div>
+    <button class="btn btn--sm" id="demo">${icons.spark}<span data-i18n="hub.demo"></span></button>
     <p class="hub__note" data-i18n="footer.privacy"></p>
   </section>
 
   <div class="toolbar" id="toolbar">
     <button class="btn btn--ghost btn--sm" id="toMenu">${icons.up}<span data-i18n="menu.back"></span></button>
     <h1 class="toolbar__title"><span id="toolIcon"></span><span id="toolName"></span></h1>
+    <span class="topbar__spacer"></span>
+    <button class="btn btn--ghost btn--icon" id="undo" disabled>${icons.undo}<span class="sr-only" data-i18n="action.undo"></span></button>
+    <button class="btn btn--ghost btn--icon" id="redo" disabled>${icons.redo}<span class="sr-only" data-i18n="action.redo"></span></button>
   </div>
 
   <main class="layout">
@@ -508,6 +513,7 @@ async function addFiles(files: File[]): Promise<void> {
   renderBlocks();
   renderTranscribePlayer();
   syncFlowState();
+  scheduleSave();
   for (const a of added) {
     a.thumb = await thumbnail(a);
     for (const img of Array.from(document.querySelectorAll<HTMLImageElement>(`img[data-id="${a.id}"]`))) {
@@ -600,8 +606,156 @@ function applyAspect(aspect: Aspect): void {
 }
 
 /** Marks the score as outdated, refreshes the timeline UI and schedules a re-analysis. */
+/* ---------- undo, redo and the saved session ---------- */
+
+/** Serialised project states; every edit lands here so nothing is one click away from lost. */
+let undoStack: string[] = [];
+let historyAt = -1;
+let restoring = false;
+let saveTimer = 0;
+const savedFiles = new Set<string>();
+
+function recordHistory(): void {
+  if (restoring) return;
+  const snap = JSON.stringify(state.project);
+  if (undoStack[historyAt] === snap) return;
+  undoStack = undoStack.slice(0, historyAt + 1);
+  undoStack.push(snap);
+  if (undoStack.length > 40) undoStack.shift();
+  historyAt = undoStack.length - 1;
+  updateHistoryButtons();
+}
+
+function updateHistoryButtons(): void {
+  $<HTMLButtonElement>('undo').disabled = historyAt <= 0;
+  $<HTMLButtonElement>('redo').disabled = historyAt >= undoStack.length - 1;
+}
+
+function applySnapshot(json: string): void {
+  restoring = true;
+  try {
+    state.project = JSON.parse(json) as Project;
+    applyAspect(state.project.aspect);
+    relayout(state.project);
+    player.seek(0);
+    scoreStale = true;
+    updateTransport();
+    renderTicks();
+    renderBlocks();
+    renderScore();
+    updateBadges();
+  } finally {
+    restoring = false;
+  }
+  scheduleSave();
+  updateHistoryButtons();
+}
+
+function undo(): void {
+  if (historyAt <= 0) return;
+  historyAt--;
+  applySnapshot(undoStack[historyAt]!);
+}
+
+function redo(): void {
+  if (historyAt >= undoStack.length - 1) return;
+  historyAt++;
+  applySnapshot(undoStack[historyAt]!);
+}
+
+/** Writes the session to IndexedDB shortly after the last edit, never on every keystroke. */
+function scheduleSave(): void {
+  if (!isStorageAvailable() || restoring) return;
+  clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => void persist(), 1200);
+}
+
+async function persist(): Promise<void> {
+  if (!isStorageAvailable()) return;
+  try {
+    if (!state.assets.length) {
+      await clearSession();
+      return;
+    }
+    const order: string[] = [];
+    for (const asset of state.assets) {
+      if (!asset.file) continue;
+      order.push(asset.id);
+      if (!savedFiles.has(asset.id)) {
+        await putFile({ id: asset.id, name: asset.name, type: asset.file.type, blob: asset.file });
+        savedFiles.add(asset.id);
+      }
+    }
+    if (!order.length) return;
+    await saveSession({
+      project: state.project,
+      order,
+      packId: state.packId ?? undefined,
+      section: document.body.dataset.section ?? undefined,
+      savedAt: Date.now(),
+    });
+    await pruneFiles(order);
+  } catch {
+    /* storage full or blocked: the app keeps working, it just will not remember */
+  }
+}
+
+/** Brings back the last session: the same files, the same timeline, the same look. */
+async function restoreSession(): Promise<boolean> {
+  if (!isStorageAvailable()) return false;
+  let session;
+  try {
+    session = await readSession();
+  } catch {
+    return false;
+  }
+  if (!session?.order.length) return false;
+
+  const stored = await readFiles(session.order).catch(() => new Map());
+  const assets: MediaAsset[] = [];
+  for (const id of session.order) {
+    const found = stored.get(id);
+    if (!found) continue;
+    const file = new File([found.blob], found.name, { type: found.type });
+    const [asset] = await loadFiles([file]);
+    if (!asset) continue;
+    asset.id = id;
+    assets.push(asset);
+    savedFiles.add(id);
+  }
+  if (!assets.length) return false;
+
+  state.assets = assets;
+  state.project = session.project;
+  if (session.packId) state.packId = session.packId;
+  templateSel.value = state.project.template;
+  aspectSel.value = state.project.aspect;
+  fontSel.value = state.project.fontId;
+  styleSel.value = state.project.styleId;
+  applyAspect(state.project.aspect);
+  relayout(state.project);
+  player.seek(0);
+  markPacks();
+  renderStrip();
+  renderBlocks();
+  renderSeed();
+  updateBadges();
+  updateTransport();
+  scoreStale = true;
+  syncFlowState();
+  for (const a of assets) {
+    a.thumb = await thumbnail(a);
+    for (const img of Array.from(document.querySelectorAll<HTMLImageElement>(`img[data-id="${a.id}"]`))) {
+      img.src = a.thumb;
+    }
+  }
+  return true;
+}
+
 function touch(): void {
   relayout(state.project);
+  recordHistory();
+  scheduleSave();
   scoreStale = true;
   player.seek(Math.min(state.time, totalDuration(state.project)));
   updateTransport();
@@ -1116,6 +1270,11 @@ $('clear').addEventListener('click', () => {
   for (const a of state.assets) URL.revokeObjectURL(a.url);
   state.assets = [];
   segmentCache.clear();
+  savedFiles.clear();
+  undoStack = [];
+  historyAt = -1;
+  updateHistoryButtons();
+  void clearSession();
   score = null;
   cues = [];
   capturedAudio = null;
@@ -1871,6 +2030,57 @@ function markPacks(): void {
   }
 }
 
+/* ---------- something to try when the visitor brought no material ---------- */
+
+/** Draws a still, in the browser, so the demo ships no bytes and needs no network. */
+function demoFrame(index: number): Promise<File> {
+  const c = document.createElement('canvas');
+  c.width = 1080;
+  c.height = 1920;
+  const g = c.getContext('2d')!;
+  const hue = 210 + index * 42;
+  const sky = g.createLinearGradient(0, 0, 0, c.height);
+  sky.addColorStop(0, `hsl(${hue} 72% 58%)`);
+  sky.addColorStop(1, `hsl(${hue + 38} 60% 22%)`);
+  g.fillStyle = sky;
+  g.fillRect(0, 0, c.width, c.height);
+
+  g.globalAlpha = 0.9;
+  g.fillStyle = `hsl(${hue + 180} 85% 62%)`;
+  g.beginPath();
+  g.arc(540 + Math.sin(index) * 220, 760 + index * 40, 260 - index * 24, 0, Math.PI * 2);
+  g.fill();
+
+  g.globalAlpha = 0.35;
+  g.fillStyle = '#000';
+  for (let i = 0; i < 5; i++) {
+    g.fillRect(0, 1300 + i * 90 + index * 12, c.width, 26 + i * 8);
+  }
+
+  g.globalAlpha = 1;
+  g.fillStyle = '#ffffff';
+  g.font = 'bold 150px system-ui, sans-serif';
+  g.textAlign = 'center';
+  g.fillText(String(index + 1), 540, 1120);
+
+  return new Promise((resolve) => {
+    c.toBlob((blob) => {
+      resolve(new File([blob ?? new Blob()], `ejemplo-${index + 1}.jpg`, { type: 'image/jpeg' }));
+    }, 'image/jpeg', 0.9);
+  });
+}
+
+/** One tap from the menu to a finished reel, so the app explains itself without an upload. */
+async function loadDemo(): Promise<void> {
+  const files = await Promise.all([0, 1, 2, 3].map(demoFrame));
+  await setSection('build');
+  hookInput.value = hookInput.value || t('demo.hook');
+  ctaInput.value = ctaInput.value || t('demo.cta');
+  await addFiles(files);
+  await autoEdit();
+  toast(t('demo.ready'));
+}
+
 async function autoEdit(): Promise<void> {
   if (!state.assets.length || analyzing) return;
   analyzing = true;
@@ -2153,6 +2363,22 @@ $('hub').addEventListener('click', (e) => {
 });
 
 $('toMenu').addEventListener('click', () => setView('menu'));
+$('undo').addEventListener('click', undo);
+$('redo').addEventListener('click', redo);
+$('demo').addEventListener('click', () => void loadDemo());
+
+window.addEventListener('keydown', (e) => {
+  const target = e.target as HTMLElement | null;
+  const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
+  if (typing || !(e.ctrlKey || e.metaKey)) return;
+  if (e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    undo();
+  } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+    e.preventDefault();
+    redo();
+  }
+});
 
 $('transcript').addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-cue]');
@@ -2256,6 +2482,12 @@ const openTool = Boolean(location.hash) || Boolean(localStorage.getItem('mai-ree
 document.body.dataset.view = openTool ? 'tool' : 'menu';
 void setSection(firstSection, false);
 syncFlowState();
+void restoreSession().then((restored) => {
+  if (!restored) return;
+  syncFlowState();
+  recordHistory();
+  toast(t('session.restored'));
+});
 window.addEventListener('hashchange', () => {
   const next = location.hash.slice(1) as Section;
   if (SECTIONS.includes(next) && next !== document.body.dataset.section) void setSection(next, false);

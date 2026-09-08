@@ -1713,6 +1713,14 @@ body[data-view='menu'] .layout {
   align-self: center;
 }
 
+.toolbar .btn--icon {
+  min-width: 40px;
+}
+
+.hub #demo {
+  margin-top: 4px;
+}
+
 /* exporting only exists once there is something to export */
 body[data-result='0'] .stage__actions,
 body[data-result='0'] .stage__toggle,

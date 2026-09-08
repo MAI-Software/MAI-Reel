@@ -30,6 +30,13 @@ export const SOURCES: Source[] = [
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  'action.undo': 'Deshacer',
+  'action.redo': 'Rehacer',
+  'hub.demo': 'Probar con un ejemplo',
+  'demo.hook': 'Mira esto hasta el final',
+  'demo.cta': 'Sígueme para más',
+  'demo.ready': 'Ejemplo listo: cambia lo que quieras',
+  'session.restored': 'Sesión recuperada',
   'media.title.transcribe': 'Vídeo a transcribir',
   'media.title.boost': 'Tu vídeo ya editado',
   'media.title.build': 'Tus fotos y vídeos',
@@ -336,6 +343,13 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  'action.undo': 'Undo',
+  'action.redo': 'Redo',
+  'hub.demo': 'Try it with an example',
+  'demo.hook': 'Watch this to the end',
+  'demo.cta': 'Follow for more',
+  'demo.ready': 'Example ready — change anything',
+  'session.restored': 'Session restored',
   'media.title.transcribe': 'Video to transcribe',
   'media.title.boost': 'Your finished video',
   'media.title.build': 'Your photos and videos',
@@ -642,6 +656,13 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'action.undo': 'Annuler',
+  'action.redo': 'Rétablir',
+  'hub.demo': 'Essayer avec un exemple',
+  'demo.hook': 'Regarde jusqu’au bout',
+  'demo.cta': 'Abonne-toi pour plus',
+  'demo.ready': 'Exemple prêt — modifie ce que tu veux',
+  'session.restored': 'Session restaurée',
   'media.title.transcribe': 'Vidéo à transcrire',
   'media.title.boost': 'Votre vidéo déjà montée',
   'media.title.build': 'Vos photos et vidéos',
@@ -948,6 +969,13 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  'action.undo': 'Rückgängig',
+  'action.redo': 'Wiederholen',
+  'hub.demo': 'Mit einem Beispiel testen',
+  'demo.hook': 'Schau bis zum Ende',
+  'demo.cta': 'Folge für mehr',
+  'demo.ready': 'Beispiel fertig — ändere alles',
+  'session.restored': 'Sitzung wiederhergestellt',
   'media.title.transcribe': 'Video zum Transkribieren',
   'media.title.boost': 'Dein fertiges Video',
   'media.title.build': 'Deine Fotos und Videos',
@@ -1254,6 +1282,13 @@ const de: Dict = {
 };
 
 const it: Dict = {
+  'action.undo': 'Annulla',
+  'action.redo': 'Ripeti',
+  'hub.demo': 'Prova con un esempio',
+  'demo.hook': 'Guarda fino alla fine',
+  'demo.cta': 'Seguimi per altro',
+  'demo.ready': 'Esempio pronto — cambia quello che vuoi',
+  'session.restored': 'Sessione ripristinata',
   'media.title.transcribe': 'Video da trascrivere',
   'media.title.boost': 'Il tuo video già montato',
   'media.title.build': 'Le tue foto e i tuoi video',
