@@ -30,6 +30,13 @@ export const SOURCES: Source[] = [
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  'welcome.title': '¿Qué quieres hacer?',
+  'welcome.sub': 'Elige una opción. Todo ocurre en tu móvil u ordenador.',
+  'step.1': 'Material',
+  'step.2': 'Ajustes',
+  'step.3': 'Resultado',
+  'step.next': 'Siguiente',
+  'group.advanced': 'Opciones avanzadas',
   'app.tagline': 'Editor rápido de reels + score de viralidad',
   'lang.label': 'Idioma',
   'nav.media': 'Material',
@@ -328,6 +335,13 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  'welcome.title': 'What do you want to do?',
+  'welcome.sub': 'Pick one. Everything runs on your phone or computer.',
+  'step.1': 'Material',
+  'step.2': 'Settings',
+  'step.3': 'Result',
+  'step.next': 'Next',
+  'group.advanced': 'Advanced options',
   'app.tagline': 'Fast reel editor + virality score',
   'lang.label': 'Language',
   'nav.media': 'Media',
@@ -626,6 +640,13 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'welcome.title': 'Que voulez-vous faire ?',
+  'welcome.sub': 'Choisissez une option. Tout se passe sur votre appareil.',
+  'step.1': 'Contenu',
+  'step.2': 'Réglages',
+  'step.3': 'Résultat',
+  'step.next': 'Suivant',
+  'group.advanced': 'Options avancées',
   'app.tagline': 'Montage rapide de reels + score de viralité',
   'lang.label': 'Langue',
   'nav.media': 'Médias',
@@ -924,6 +945,13 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  'welcome.title': 'Was möchtest du machen?',
+  'welcome.sub': 'Wähle eine Option. Alles läuft auf deinem Gerät.',
+  'step.1': 'Material',
+  'step.2': 'Einstellungen',
+  'step.3': 'Ergebnis',
+  'step.next': 'Weiter',
+  'group.advanced': 'Erweiterte Optionen',
   'app.tagline': 'Schneller Reel-Editor + Viralitäts-Score',
   'lang.label': 'Sprache',
   'nav.media': 'Material',
@@ -1222,6 +1250,13 @@ const de: Dict = {
 };
 
 const it: Dict = {
+  'welcome.title': 'Cosa vuoi fare?',
+  'welcome.sub': 'Scegli un’opzione. Tutto avviene sul tuo dispositivo.',
+  'step.1': 'Materiale',
+  'step.2': 'Impostazioni',
+  'step.3': 'Risultato',
+  'step.next': 'Avanti',
+  'group.advanced': 'Opzioni avanzate',
   'app.tagline': 'Editor rapido di reel + punteggio di viralità',
   'lang.label': 'Lingua',
   'nav.media': 'Materiale',

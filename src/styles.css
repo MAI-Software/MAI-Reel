@@ -1448,7 +1448,8 @@ body[data-mode='multi'] .panel--edit > .empty-note:last-child {
   white-space: nowrap;
 }
 
-/* only the panels that belong to the active section are mounted */
+/* nothing is mounted until the section and the step both ask for it */
+.panel--media,
 .panel--transcript,
 .panel--boost,
 .panel--multi,
@@ -1459,26 +1460,33 @@ body[data-mode='multi'] .panel--edit > .empty-note:last-child {
   display: none;
 }
 
-body[data-section='transcribe'] .panel--media,
-body[data-section='transcribe'] .panel--transcript,
-body[data-section='boost'] .panel--media,
-body[data-section='boost'] .panel--boost,
-body[data-section='boost'] .panel--transcript,
-body[data-section='boost'] .stage,
-body[data-section='boost'] .panel--blocks,
-body[data-section='boost'] .panel--score,
-body[data-section='build'] .panel--media,
-body[data-section='build'] .panel--edit,
-body[data-section='build'] .panel--transcript,
-body[data-section='build'] .stage,
-body[data-section='build'] .panel--blocks,
-body[data-section='build'] .panel--score,
-body[data-section='multi'] .panel--media,
-body[data-section='multi'] .panel--multi,
-body[data-section='multi'] .panel--transcript,
-body[data-section='multi'] .stage,
-body[data-section='multi'] .panel--blocks,
-body[data-section='multi'] .panel--score {
+/* step 1: what am I working with */
+body[data-step='1'] .panel--media {
+  display: flex;
+}
+
+/* step 2: how do I want it */
+body[data-step='2'][data-section='transcribe'] .panel--transcript,
+body[data-step='2'][data-section='boost'] .panel--boost,
+body[data-step='2'][data-section='build'] .panel--edit,
+body[data-step='2'][data-section='multi'] .panel--multi,
+/* step 3: here it is */
+body[data-step='3'][data-section='transcribe'] .panel--transcript,
+body[data-step='3'][data-section='boost'] .stage,
+body[data-step='3'][data-section='boost'] .panel--score,
+body[data-step='3'][data-section='boost'] .panel--blocks,
+body[data-step='3'][data-section='build'] .stage,
+body[data-step='3'][data-section='build'] .panel--score,
+body[data-step='3'][data-section='build'] .panel--blocks,
+body[data-step='3'][data-section='multi'] .panel--multi,
+body[data-step='3'][data-section='multi'] .stage,
+body[data-step='3'][data-section='multi'] .panel--score {
+  display: flex;
+}
+
+/* the preview is worth seeing while the settings are being touched */
+body[data-step='2'][data-section='boost'] .stage,
+body[data-step='2'][data-section='build'] .stage {
   display: flex;
 }
 
@@ -1612,6 +1620,198 @@ body[data-section='multi'] .panel--score {
 
 /* ---------- responsive overrides (kept last so they win by order) ---------- */
 
+
+/* ---------- welcome: the single question that starts everything ---------- */
+
+.welcome {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 16px 40px;
+  text-align: center;
+}
+
+body[data-welcome='on'] .welcome {
+  display: flex;
+}
+
+body[data-welcome='on'] .sections,
+body[data-welcome='on'] .steps-bar,
+body[data-welcome='on'] .layout {
+  display: none;
+}
+
+.welcome h1 {
+  margin: 0;
+  font-size: clamp(23px, 5vw, 32px);
+  line-height: 1.15;
+}
+
+.welcome > p {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--fg-dim);
+  font-size: 15px;
+}
+
+.welcome__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 900px;
+  margin-top: 14px;
+}
+
+.wcard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 124px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  text-align: left;
+  transition: border-color 160ms ease-out, background 160ms ease-out, transform 160ms ease-out;
+}
+
+.wcard:hover {
+  border-color: var(--primary);
+  background: var(--surface-2);
+  transform: translateY(-2px);
+}
+
+.wcard svg {
+  width: 26px;
+  height: 26px;
+  color: var(--primary);
+}
+
+.wcard strong {
+  font-size: 17px;
+}
+
+.wcard small {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--fg-dim);
+}
+
+.welcome__note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--fg-faint);
+}
+
+/* ---------- the three steps, always visible so nobody gets lost ---------- */
+
+.steps-bar {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 10px 12px 0;
+  list-style: none;
+}
+
+.steps-bar li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg-faint);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.steps-bar li span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.steps-bar li em {
+  overflow: hidden;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.steps-bar li[aria-current='true'] {
+  border-color: var(--primary);
+  color: var(--fg);
+}
+
+.steps-bar li[aria-current='true'] span {
+  background: var(--primary);
+  color: #fff;
+}
+
+.steps-bar li.is-done span {
+  background: var(--accent);
+  color: #fff;
+}
+
+.steps-bar li.is-locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------- one obvious action per screen ---------- */
+
+.btn--hero {
+  width: 100%;
+  min-height: 52px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.btn--next {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 2px;
+}
+
+.btn--next[disabled] {
+  opacity: 0.4;
+}
+
+.stage__toggle {
+  align-self: center;
+}
+
+/* exporting belongs to the result screen only */
+body:not([data-step='3']) .stage__actions,
+body:not([data-step='3']) .stage__toggle,
+body:not([data-step='3']) .stage > .empty-note {
+  display: none;
+}
+
+/* the score answers "is it any good"; the shot list is for whoever wants to tweak */
+.panel--score {
+  order: 0;
+}
+
+.panel--blocks {
+  order: 1;
+}
+
 @media (max-width: 1023px) {
   /* one scrollable panel at a time: the page itself never scrolls */
   .col {
@@ -1621,6 +1821,9 @@ body[data-section='multi'] .panel--score {
   .layout {
     display: flex;
     flex-direction: column;
+    /* a column with flex-start cross alignment sizes panels to their content,
+       which pushed the widest control past the screen edge */
+    align-items: stretch;
     gap: 8px;
     padding: 8px;
   }
