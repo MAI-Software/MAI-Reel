@@ -1,5 +1,7 @@
 export interface AudioTrack {
   el: HTMLAudioElement;
+  /** Kept so the offline export can decode and mix the track without playing it. */
+  file: File;
   name: string;
   duration: number;
   /** Normalised waveform peaks (0..1) for the mini waveform. */
@@ -209,7 +211,7 @@ export async function loadAudioFile(file: File): Promise<AudioTrack> {
     });
   }
 
-  return { el, name: file.name, duration, peaks, beats, bpm, in: 0 };
+  return { el, file, name: file.name, duration, peaks, beats, bpm, in: 0 };
 }
 
 /** Beats inside [from, from + length], expressed as seconds from the fragment start. */

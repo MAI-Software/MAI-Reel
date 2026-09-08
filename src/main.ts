@@ -1177,6 +1177,16 @@ async function shareExport(): Promise<void> {
   }
 }
 
+/** Hands the finished file to the browser, and offers the share sheet where there is one. */
+function finishExport(blob: Blob, mime: string): void {
+  const name = `mai-reel-${Date.now()}.${extensionFor(mime)}`;
+  downloadBlob(blob, name);
+  // the share button needs its own tap: the gesture that started the export is long expired
+  lastExport = new File([blob], name, { type: mime });
+  $<HTMLButtonElement>('share').hidden = !canShareFile(lastExport);
+  toast(t('export.done'));
+}
+
 async function exportVideo(): Promise<void> {
   if (!state.assets.length) return;
   if (!pickMime()) {
@@ -1201,6 +1211,26 @@ async function exportVideo(): Promise<void> {
     player.seek(0);
 
     const dur = totalDuration(state.project);
+
+    // WebCodecs encodes offline: no dropped frames, no waiting out the reel in real time.
+    // The muxer is only fetched when somebody actually exports.
+    const fast = await import('./engine/fastExport');
+    if (await fast.canFastExport(renderer.canvas.width, renderer.canvas.height)) {
+      const blob = await fast.fastExport({
+        project: state.project,
+        renderer,
+        resolve: assetById,
+        music: state.audio ? { file: state.audio.file, offset: state.audio.in } : null,
+        onProgress: (fraction) => {
+          const pct = Math.round(fraction * 100);
+          label.textContent = `${t('action.exporting')} ${pct}%`;
+          exportBtn.style.setProperty('--progress', `${pct}%`);
+        },
+      });
+      finishExport(blob, 'video/mp4');
+      return;
+    }
+
     const { blob, mime } = await recordCanvas({
       canvas: renderer.canvas,
       fps: state.project.fps,
@@ -1219,14 +1249,7 @@ async function exportVideo(): Promise<void> {
           player.play();
         }),
     });
-    const name = `mai-reel-${Date.now()}.${extensionFor(mime)}`;
-    downloadBlob(blob, name);
-    // on a phone the useful next step is the share sheet, not a file in Downloads; the button
-    // needs its own tap because the gesture that started the export expired while it recorded
-    lastExport = new File([blob], name, { type: mime });
-    const shareBtn = $<HTMLButtonElement>('share');
-    shareBtn.hidden = !canShareFile(lastExport);
-    toast(t('export.done'));
+    finishExport(blob, mime);
   } catch (err) {
     toast(String(err instanceof Error ? err.message : err));
   } finally {
