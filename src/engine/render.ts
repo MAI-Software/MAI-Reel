@@ -1,4 +1,4 @@
-import type { Aspect, Enhance, MediaAsset, Project, TextOverlay } from '../types';
+import type { Aspect, Enhance, MediaAsset, Platform, Project, TextOverlay } from '../types';
 import { fontCss, styleById } from '../data/typography';
 import { effectById, gradeById, transitionById, type Ease, type MotionSpec } from '../data/effects';
 
@@ -9,7 +9,31 @@ export const SIZES: Record<Aspect, [number, number]> = {
 };
 
 /** Safe zones: fraction of the frame reserved by the platform UI (Meta / TikTok overlays). */
-export const SAFE = { top: 0.14, bottom: 0.2, side: 0.06 };
+export interface SafeArea {
+  top: number;
+  bottom: number;
+  side: number;
+  /** The action rail (like, comment, share) lives on the right of every app. */
+  right: number;
+}
+
+/**
+ * Fractions of the frame each app covers with its own interface. Measured from the published
+ * layout guides: the caption block at the bottom, the header at the top and the action rail.
+ */
+export const SAFE_AREAS: Record<Platform, SafeArea> = {
+  generic: { top: 0.14, bottom: 0.2, side: 0.06, right: 0.06 },
+  tiktok: { top: 0.1, bottom: 0.24, side: 0.06, right: 0.2 },
+  reels: { top: 0.13, bottom: 0.22, side: 0.06, right: 0.16 },
+  shorts: { top: 0.1, bottom: 0.16, side: 0.06, right: 0.14 },
+};
+
+export function safeAreaFor(platform: Platform | undefined): SafeArea {
+  return SAFE_AREAS[platform ?? 'generic'] ?? SAFE_AREAS.generic;
+}
+
+/** Kept for the code that only needs the default insets. */
+export const SAFE = SAFE_AREAS.generic;
 
 const clampRange = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 export const TRANSITION_DUR = 0.32;
@@ -184,6 +208,8 @@ export class ReelRenderer {
   /** Scratch buffer for the pixelate transition. */
   private tmp: HTMLCanvasElement;
   private lastIndex = -1;
+  /** Safe area of the project being drawn; set on every draw call. */
+  private safe: SafeArea = SAFE_AREAS.generic;
   private aspect: Aspect;
   private scale = 1;
 
@@ -335,7 +361,7 @@ export class ReelRenderer {
     const inP = clamp01(local / (anim === 'typewriter' ? Math.min(0.9, life * 0.5) : 0.26));
     const outP = clamp01((o.end - t) / 0.22);
 
-    const maxW = dw * (1 - SAFE.side * 2) - 40 * this.unit;
+    const maxW = dw * (1 - this.safe.side - this.safe.right) - 40 * this.unit;
     const full = style.uppercase ? o.text.toUpperCase() : o.text;
     const shown = anim === 'typewriter' ? full.slice(0, Math.max(1, Math.round(full.length * inP))) : full;
     const lines = wrapText(ctx, shown, maxW);
@@ -343,7 +369,7 @@ export class ReelRenderer {
     const blockH = lines.length * lh;
     const margin = 20 * this.unit;
     let top = o.y * dh - blockH / 2;
-    top = Math.max(dh * SAFE.top + margin, Math.min(top, dh * (1 - SAFE.bottom) - blockH - margin));
+    top = Math.max(dh * this.safe.top + margin, Math.min(top, dh * (1 - this.safe.bottom) - blockH - margin));
 
     let alpha = Math.min(easeWith('smooth', inP), easeWith('smooth', outP));
     let scale = 1;
@@ -373,30 +399,31 @@ export class ReelRenderer {
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.translate(dw / 2, top + blockH / 2 + offsetY);
+    const cx = (dw * this.safe.side + dw * (1 - this.safe.right)) / 2;
+    ctx.translate(cx, top + blockH / 2 + offsetY);
     ctx.scale(scale, scale);
-    ctx.translate(-dw / 2, -(top + blockH / 2));
+    ctx.translate(-cx, -(top + blockH / 2));
 
     if (style.bg && lines.length) {
       const padX = size * 0.5;
       const padY = size * 0.34;
       const wBox = Math.max(...lines.map((l) => ctx.measureText(l).width)) + padX * 2;
       ctx.fillStyle = style.bg;
-      roundRect(ctx, (dw - wBox) / 2, top - padY, wBox, blockH + padY * 2, size * 0.28);
+      roundRect(ctx, cx - wBox / 2, top - padY, wBox, blockH + padY * 2, size * 0.28);
       ctx.fill();
     }
 
     lines.forEach((line, i) => {
       const y = top + lh * i + lh / 2;
       if (anim === 'karaoke') {
-        this.drawKaraokeLine(line, full, y, size, style, clamp01(local / life), o, t);
+        this.drawKaraokeLine(line, full, y, size, style, clamp01(local / life), o, t, cx);
         return;
       }
       if (style.stroke) {
         ctx.lineWidth = size * (style.strokeWidth ?? 0.14);
         ctx.strokeStyle = style.stroke;
         ctx.lineJoin = 'round';
-        ctx.strokeText(line, dw / 2, y);
+        ctx.strokeText(line, cx, y);
       }
       if (style.glow) {
         ctx.shadowColor = style.glow.color;
@@ -408,7 +435,7 @@ export class ReelRenderer {
         ctx.shadowOffsetY = size * style.shadow.dy;
       }
       ctx.fillStyle = style.fill;
-      ctx.fillText(line, dw / 2, y);
+      ctx.fillText(line, cx, y);
       ctx.shadowBlur = 0;
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 0;
@@ -430,6 +457,7 @@ export class ReelRenderer {
     progress: number,
     overlay?: TextOverlay,
     t = 0,
+    cx?: number,
   ): void {
     const { ctx } = this;
     const dw = this.canvas.width;
@@ -442,7 +470,7 @@ export class ReelRenderer {
       : progress * totalWords;
     const currentWord = timings?.length ? timings.findIndex((w) => w.start <= t && w.end > t) : -1;
     const lineWidth = ctx.measureText(line).width;
-    let x = (dw - lineWidth) / 2;
+    let x = (cx ?? dw / 2) - lineWidth / 2;
     const spaceW = ctx.measureText(' ').width;
     const startIndex = full.indexOf(line) >= 0 ? full.slice(0, full.indexOf(line)).split(/\s+/).filter(Boolean).length : 0;
 
@@ -469,20 +497,28 @@ export class ReelRenderer {
     const { ctx } = this;
     const dw = this.canvas.width;
     const dh = this.canvas.height;
+    const safe = this.safe;
     ctx.save();
     ctx.fillStyle = 'rgba(236,72,153,0.14)';
-    ctx.fillRect(0, 0, dw, dh * SAFE.top);
-    ctx.fillRect(0, dh * (1 - SAFE.bottom), dw, dh * SAFE.bottom);
+    ctx.fillRect(0, 0, dw, dh * safe.top);
+    ctx.fillRect(0, dh * (1 - safe.bottom), dw, dh * safe.bottom);
+    ctx.fillRect(dw * (1 - safe.right), dh * safe.top, dw * safe.right, dh * (1 - safe.top - safe.bottom));
     ctx.strokeStyle = 'rgba(236,72,153,0.9)';
     ctx.setLineDash([18 * this.unit, 14 * this.unit]);
     ctx.lineWidth = 4 * this.unit;
-    ctx.strokeRect(dw * SAFE.side, dh * SAFE.top, dw * (1 - SAFE.side * 2), dh * (1 - SAFE.top - SAFE.bottom));
+    ctx.strokeRect(
+      dw * safe.side,
+      dh * safe.top,
+      dw * (1 - safe.side - safe.right),
+      dh * (1 - safe.top - safe.bottom),
+    );
     ctx.restore();
   }
 
   /** Renders the project at timeline second `t`. Call with increasing `t` so transitions blend. */
   draw(project: Project, resolve: Resolve, t: number, opts: { safeZones?: boolean } = {}): void {
     const { ctx } = this;
+    this.safe = safeAreaFor(project.platform);
     const dw = this.canvas.width;
     const dh = this.canvas.height;
 

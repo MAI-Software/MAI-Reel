@@ -25,6 +25,8 @@ export type ReelMode = 'viral' | 'build' | 'multi';
 export type TemplateId = 'punch' | 'flow' | 'story';
 export type Aspect = '9:16' | '4:5' | '1:1';
 export type TextRole = 'hook' | 'caption' | 'cta';
+/** Where the reel is going: each app covers a different part of the frame with its own UI. */
+export type Platform = 'generic' | 'tiktok' | 'reels' | 'shorts';
 
 export interface Clip {
   id: string;
@@ -101,4 +103,6 @@ export interface Project {
   enhance: Enhance;
   /** How loud the source video is heard, 0..1. */
   sourceVolume?: number;
+  /** Drives the safe area: TikTok, Reels and Shorts each cover different edges. */
+  platform?: Platform;
 }

@@ -1,6 +1,6 @@
 import type { Project } from '../types';
 import type { MediaStats } from './frames';
-import { SAFE, totalDuration } from '../engine/render';
+import { safeAreaFor, totalDuration } from '../engine/render';
 import { styleById } from '../data/typography';
 import { t } from '../i18n';
 
@@ -120,8 +120,9 @@ export function scoreProject(project: Project, media: MediaStats, audio: ScoreCo
   }
 
   // 4. Format (10)
+  const safe = safeAreaFor(project.platform);
   const aspectScore = project.aspect === '9:16' ? 10 : project.aspect === '4:5' ? 7 : 5;
-  const outside = project.texts.filter((t) => t.y < SAFE.top || t.y > 1 - SAFE.bottom).length;
+  const outside = project.texts.filter((t) => t.y < safe.top || t.y > 1 - safe.bottom).length;
   const formatScore = Math.max(0, aspectScore - outside * 2);
 
   // 5. Text (15) — presence, size, dwell time and whether it can be read over the picture
@@ -171,7 +172,12 @@ export function scoreProject(project: Project, media: MediaStats, audio: ScoreCo
           : `${Math.round(spokenCuts * 100)}% ${t('detail.onVoice')}`,
       ],
     },
-    { id: 'format', score: formatScore, max: 10, detail: [project.aspect] },
+    {
+      id: 'format',
+      score: formatScore,
+      max: 10,
+      detail: [project.aspect, t(`platform.${project.platform ?? 'generic'}`)],
+    },
     {
       id: 'text',
       score: textScore,

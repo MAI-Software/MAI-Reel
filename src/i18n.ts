@@ -30,6 +30,12 @@ export const SOURCES: Source[] = [
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  'action.share': 'Compartir',
+  'platform.label': 'Plataforma',
+  'platform.generic': 'Genérica',
+  'platform.tiktok': 'TikTok',
+  'platform.reels': 'Instagram Reels',
+  'platform.shorts': 'YouTube Shorts',
   'detail.onBeat': 'al ritmo',
   'detail.onVoice': 'sobre la voz',
   'detail.legible': 'legible',
@@ -349,6 +355,12 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  'action.share': 'Share',
+  'platform.label': 'Platform',
+  'platform.generic': 'Generic',
+  'platform.tiktok': 'TikTok',
+  'platform.reels': 'Instagram Reels',
+  'platform.shorts': 'YouTube Shorts',
   'detail.onBeat': 'on beat',
   'detail.onVoice': 'on the voice',
   'detail.legible': 'legible',
@@ -668,6 +680,12 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'action.share': 'Partager',
+  'platform.label': 'Plateforme',
+  'platform.generic': 'Générique',
+  'platform.tiktok': 'TikTok',
+  'platform.reels': 'Instagram Reels',
+  'platform.shorts': 'YouTube Shorts',
   'detail.onBeat': 'sur le rythme',
   'detail.onVoice': 'sur la voix',
   'detail.legible': 'lisible',
@@ -987,6 +1005,12 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  'action.share': 'Teilen',
+  'platform.label': 'Plattform',
+  'platform.generic': 'Allgemein',
+  'platform.tiktok': 'TikTok',
+  'platform.reels': 'Instagram Reels',
+  'platform.shorts': 'YouTube Shorts',
   'detail.onBeat': 'im Takt',
   'detail.onVoice': 'auf der Stimme',
   'detail.legible': 'lesbar',
@@ -1306,6 +1330,12 @@ const de: Dict = {
 };
 
 const it: Dict = {
+  'action.share': 'Condividi',
+  'platform.label': 'Piattaforma',
+  'platform.generic': 'Generica',
+  'platform.tiktok': 'TikTok',
+  'platform.reels': 'Instagram Reels',
+  'platform.shorts': 'YouTube Shorts',
   'detail.onBeat': 'a ritmo',
   'detail.onVoice': 'sulla voce',
   'detail.legible': 'leggibile',

@@ -226,6 +226,7 @@ function shell(): string {
       <div class="row stage__actions">
         <button class="btn btn--accent btn--hero" id="export">${icons.download}<span data-i18n="action.export"></span></button>
         <button class="btn" id="variant">${icons.wand}<span data-i18n="action.variant"></span></button>
+        <button class="btn" id="share" hidden>${icons.external}<span data-i18n="action.share"></span></button>
       </div>
       <label class="toggle stage__toggle"><input type="checkbox" id="safe" /><span data-i18n="safe.label"></span></label>
       <p class="empty-note" data-i18n="export.hint"></p>
@@ -289,6 +290,15 @@ function shell(): string {
               <option value="9:16">9:16 · Reels</option>
               <option value="4:5">4:5 · feed</option>
               <option value="1:1">1:1 · square</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="platform" data-i18n="platform.label"></label>
+            <select id="platform">
+              <option value="generic" data-i18n="platform.generic"></option>
+              <option value="tiktok" data-i18n="platform.tiktok"></option>
+              <option value="reels" data-i18n="platform.reels"></option>
+              <option value="shorts" data-i18n="platform.shorts"></option>
             </select>
           </div>
           <div class="field">
@@ -735,6 +745,7 @@ async function restoreSession(): Promise<boolean> {
   if (session.packId) state.packId = session.packId;
   templateSel.value = state.project.template;
   aspectSel.value = state.project.aspect;
+  $<HTMLSelectElement>('platform').value = state.project.platform ?? 'generic';
   fontSel.value = state.project.fontId;
   styleSel.value = state.project.styleId;
   applyAspect(state.project.aspect);
@@ -1149,6 +1160,23 @@ function toast(msg: string): void {
   setTimeout(() => el.remove(), 3800);
 }
 
+/** The last exported file, kept so it can be handed to the system share sheet. */
+let lastExport: File | null = null;
+
+function canShareFile(file: File): boolean {
+  const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
+  return typeof nav.share === 'function' && Boolean(nav.canShare?.({ files: [file] }));
+}
+
+async function shareExport(): Promise<void> {
+  if (!lastExport) return;
+  try {
+    await navigator.share({ files: [lastExport], title: 'MAI-Reel' });
+  } catch {
+    /* the sheet was dismissed: the file is already in Downloads anyway */
+  }
+}
+
 async function exportVideo(): Promise<void> {
   if (!state.assets.length) return;
   if (!pickMime()) {
@@ -1191,7 +1219,13 @@ async function exportVideo(): Promise<void> {
           player.play();
         }),
     });
-    downloadBlob(blob, `mai-reel-${Date.now()}.${extensionFor(mime)}`);
+    const name = `mai-reel-${Date.now()}.${extensionFor(mime)}`;
+    downloadBlob(blob, name);
+    // on a phone the useful next step is the share sheet, not a file in Downloads; the button
+    // needs its own tap because the gesture that started the export expired while it recorded
+    lastExport = new File([blob], name, { type: mime });
+    const shareBtn = $<HTMLButtonElement>('share');
+    shareBtn.hidden = !canShareFile(lastExport);
     toast(t('export.done'));
   } catch (err) {
     toast(String(err instanceof Error ? err.message : err));
@@ -1368,6 +1402,15 @@ $('captions').addEventListener('click', () => {
   toast(`${captions.length} ${t('toast.captions')}`);
 });
 
+$('platform').addEventListener('change', (e) => {
+  // each app hides a different part of the frame, so the safe area and the text layout move
+  state.project.platform = (e.target as HTMLSelectElement).value as Project['platform'];
+  localStorage.setItem('mai-reel-platform', state.project.platform ?? 'generic');
+  touch();
+  player.seek(state.time);
+  renderScore();
+});
+
 $('rebuild').addEventListener('click', () => {
   void ensureSegments().then((segments) => {
     rebuild(undefined, segments);
@@ -1376,6 +1419,7 @@ $('rebuild').addEventListener('click', () => {
 });
 analyzeBtn.addEventListener('click', () => void analyze());
 exportBtn.addEventListener('click', () => void exportVideo());
+$('share').addEventListener('click', () => void shareExport());
 scoreChip.addEventListener('click', () => {
   $('panel-score').scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
@@ -2487,6 +2531,11 @@ const openTool = Boolean(location.hash) || Boolean(localStorage.getItem('mai-ree
 document.body.dataset.view = openTool ? 'tool' : 'menu';
 void setSection(firstSection, false);
 syncFlowState();
+const storedPlatform = localStorage.getItem('mai-reel-platform');
+if (storedPlatform) {
+  state.project.platform = storedPlatform as Project['platform'];
+  $<HTMLSelectElement>('platform').value = storedPlatform;
+}
 void restoreSession().then((restored) => {
   if (!restored) return;
   syncFlowState();
