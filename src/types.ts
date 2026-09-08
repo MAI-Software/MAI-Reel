@@ -35,6 +35,10 @@ export interface Clip {
   effect: Effect;
   transition: Transition;
   grade: Grade;
+  /** Cut around speech: the music ducks under it and the framing follows the speaker. */
+  spoken?: boolean;
+  /** Where the subject sits in the source frame (0..1), used to reframe the crop. */
+  focus?: { x: number; y: number };
 }
 
 /** One spoken word with the time it is said, used for word-by-word captions. */
@@ -95,4 +99,6 @@ export interface Project {
   fontId: string;
   styleId: string;
   enhance: Enhance;
+  /** How loud the source video is heard, 0..1. */
+  sourceVolume?: number;
 }

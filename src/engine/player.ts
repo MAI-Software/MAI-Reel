@@ -1,6 +1,7 @@
 import type { MediaAsset, Project } from '../types';
 import { ReelRenderer, totalDuration, clipIndexAt } from './render';
 import type { AudioTrack } from './audio';
+import { attachMusic, attachVideo, resumeAudio, setDuck, setVideoVolume } from './mixer';
 
 export interface PlayerHooks {
   getProject: () => Project;
@@ -27,6 +28,8 @@ export class Player {
     if (this.playing) return;
     if (this.time >= this.duration - 0.05) this.seek(0);
     this.playing = true;
+    resumeAudio();
+    this.routeAudio();
     this.last = performance.now();
     this.syncAudio(true);
     this.raf = requestAnimationFrame(this.tick);
@@ -74,6 +77,33 @@ export class Player {
     this.raf = requestAnimationFrame(this.tick);
   };
 
+  /**
+   * Puts the music and the audio of every video into the mixer. Videos load muted so a seek
+   * never blurts sound; from the first play they are heard through the mixer instead.
+   */
+  private routeAudio(): void {
+    const project = this.hooks.getProject();
+    const volume = project.sourceVolume ?? 1;
+    const music = this.hooks.getAudio();
+    if (music) attachMusic(music.el);
+    for (const clip of project.clips) {
+      const asset = this.hooks.resolve(clip.assetId);
+      if (!asset || asset.kind !== 'video') continue;
+      const v = asset.el as HTMLVideoElement;
+      v.muted = false;
+      v.volume = 1;
+      attachVideo(v, volume);
+      setVideoVolume(v, volume);
+    }
+  }
+
+  /** Music drops under the voice while a shot cut around speech is on screen. */
+  private updateDuck(active: { spoken?: boolean } | undefined): void {
+    const project = this.hooks.getProject();
+    const speaking = Boolean(active?.spoken) && (project.sourceVolume ?? 1) > 0.05;
+    setDuck(speaking ? 0.25 : 1);
+  }
+
   /** Keeps the music locked to the timeline, playing from the chosen fragment offset. */
   private syncAudio(hard: boolean): void {
     const track = this.hooks.getAudio();
@@ -97,6 +127,7 @@ export class Player {
     const project = this.hooks.getProject();
     const i = clipIndexAt(project, this.time);
     const active = i >= 0 ? project.clips[i] : undefined;
+    if (this.playing) this.updateDuck(active);
     for (const clip of project.clips) {
       const asset = this.hooks.resolve(clip.assetId);
       if (!asset || asset.kind !== 'video') continue;

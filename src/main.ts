@@ -468,7 +468,7 @@ function applyI18n(): void {
   ctaInput.placeholder = t('cta.placeholder');
   scriptInput.placeholder = t('script.placeholder');
   // the score details and the director log are baked strings: rebuild them in the new language
-  if (lastStats && score) score = scoreProject(state.project, lastStats);
+  if (lastStats && score) score = scoreProject(state.project, lastStats, scoreContext());
   renderScore();
   renderStrip();
   renderBlocks();
@@ -538,6 +538,11 @@ function renderStrip(): void {
 }
 
 /* ---------- build ---------- */
+
+/** What the rubric needs to know about the sound: the beat grid and whether there is music. */
+function scoreContext(): { beats?: number[]; music: boolean } {
+  return { beats: currentBeats(), music: Boolean(state.audio) };
+}
 
 function currentBeats(): number[] | undefined {
   if (!snapBeats.checked || !state.audio) return undefined;
@@ -1122,7 +1127,7 @@ async function analyze(): Promise<void> {
   try {
     const media = await analyzeMedia(state.project, assetById);
     lastStats = media;
-    score = scoreProject(state.project, media);
+    score = scoreProject(state.project, media, scoreContext());
     scoreStale = false;
   } finally {
     analyzing = false;
@@ -2122,7 +2127,7 @@ async function autoEdit(): Promise<void> {
     markPreset();
     markPacks();
     applyAspect(state.project.aspect);
-    score = scoreProject(state.project, stats);
+    score = scoreProject(state.project, stats, scoreContext());
     scoreStale = false;
     lastReasons = result.reasons;
     lastNotes = result.notes ?? [];

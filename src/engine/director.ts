@@ -215,7 +215,7 @@ export function autoDirect(ctx: DirectorContext): DirectorResult | null {
       for (const clip of project.clips) clip.grade = pack.grade;
     }
 
-    const result = scoreProject(project, ctx.stats);
+    const result = scoreProject(project, ctx.stats, { beats: ctx.beats, music: Boolean(ctx.bpm) });
     tried.push({ key: 'pack', packId: pack.id, score: result.total });
     if (!best || result.total > best.score) {
       best = { project, seed, decision: { ...plan, pack }, score: result.total, reasons: [] };

@@ -210,6 +210,14 @@ export function composeShots(project: Project, ctx: ComposeContext): Project {
     clip.transition = transition;
     clip.grade = grade;
 
+    // a wide frame cropped to 9:16 should keep the subject, not the middle of the room
+    const subject = shot?.subject;
+    if (subject && subject.coverage > 0.02 && Math.hypot(subject.x - 0.5, subject.y - 0.5) > 0.06) {
+      clip.focus = { x: subject.x, y: subject.y };
+    } else {
+      delete clip.focus;
+    }
+
     recentEffects.unshift(clip.effect);
     recentEffects.length = Math.min(recentEffects.length, 3);
     recentTransitions.unshift(clip.transition);

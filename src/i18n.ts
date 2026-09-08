@@ -30,6 +30,12 @@ export const SOURCES: Source[] = [
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  'detail.onBeat': 'al ritmo',
+  'detail.onVoice': 'sobre la voz',
+  'detail.legible': 'legible',
+  'tip.text.contrast': 'El texto se pierde sobre el fondo: usa un estilo con caja o contorno, o muévelo a una zona más oscura.',
+  'tip.pace.offbeat': 'Los cortes no caen en el ritmo de la música: activa el ajuste al beat o cambia la duración.',
+  'tip.audio.none': 'No hay ni música ni voz: el sonido es la mitad de la retención en vídeo corto.',
   'action.undo': 'Deshacer',
   'action.redo': 'Rehacer',
   'hub.demo': 'Probar con un ejemplo',
@@ -343,6 +349,12 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  'detail.onBeat': 'on beat',
+  'detail.onVoice': 'on the voice',
+  'detail.legible': 'legible',
+  'tip.text.contrast': 'The text disappears into the background: use a boxed or outlined style, or move it over a darker area.',
+  'tip.pace.offbeat': 'The cuts miss the beat: turn beat snapping on or change the length.',
+  'tip.audio.none': 'No music and no voice: sound carries half of the retention in short video.',
   'action.undo': 'Undo',
   'action.redo': 'Redo',
   'hub.demo': 'Try it with an example',
@@ -656,6 +668,12 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'detail.onBeat': 'sur le rythme',
+  'detail.onVoice': 'sur la voix',
+  'detail.legible': 'lisible',
+  'tip.text.contrast': 'Le texte se perd sur le fond : utilisez un style avec fond ou contour, ou déplacez-le sur une zone plus sombre.',
+  'tip.pace.offbeat': 'Les coupes tombent à côté du rythme : activez le calage sur les temps ou changez la durée.',
+  'tip.audio.none': 'Ni musique ni voix : le son porte la moitié de la rétention en vidéo courte.',
   'action.undo': 'Annuler',
   'action.redo': 'Rétablir',
   'hub.demo': 'Essayer avec un exemple',
@@ -969,6 +987,12 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  'detail.onBeat': 'im Takt',
+  'detail.onVoice': 'auf der Stimme',
+  'detail.legible': 'lesbar',
+  'tip.text.contrast': 'Der Text verschwindet im Hintergrund: nimm einen Stil mit Box oder Kontur, oder leg ihn über eine dunklere Stelle.',
+  'tip.pace.offbeat': 'Die Schnitte treffen den Takt nicht: Beat-Raster einschalten oder die Länge ändern.',
+  'tip.audio.none': 'Weder Musik noch Stimme: Ton trägt die Hälfte der Watchtime im Kurzvideo.',
   'action.undo': 'Rückgängig',
   'action.redo': 'Wiederholen',
   'hub.demo': 'Mit einem Beispiel testen',
@@ -1282,6 +1306,12 @@ const de: Dict = {
 };
 
 const it: Dict = {
+  'detail.onBeat': 'a ritmo',
+  'detail.onVoice': 'sulla voce',
+  'detail.legible': 'leggibile',
+  'tip.text.contrast': 'Il testo si perde sullo sfondo: usa uno stile con riquadro o contorno, o spostalo su una zona più scura.',
+  'tip.pace.offbeat': 'I tagli non cadono a ritmo: attiva l’aggancio al beat o cambia la durata.',
+  'tip.audio.none': 'Niente musica né voce: il suono vale metà della ritenzione nel video breve.',
   'action.undo': 'Annulla',
   'action.redo': 'Ripeti',
   'hub.demo': 'Prova con un esempio',

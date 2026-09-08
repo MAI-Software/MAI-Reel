@@ -73,6 +73,8 @@ interface ShotSource {
   srcIn: number;
   /** Longest this shot can run before it outlives its source. */
   maxLen: number;
+  /** The piece was cut around speech. */
+  spoken?: boolean;
 }
 
 /**
@@ -82,23 +84,30 @@ interface ShotSource {
 function shotSources(assets: MediaAsset[], spec: TemplateSpec, opts: BuildOptions, target: number): ShotSource[] {
   const out: ShotSource[] = [];
   const videos = assets.filter((a) => a.kind === 'video').length;
-  for (const asset of assets) {
+  assets.forEach((asset, assetIndex) => {
     if (asset.kind !== 'video') {
       out.push({ asset, srcIn: 0, maxLen: Number.POSITIVE_INFINITY });
-      continue;
+      return;
     }
-    const segments = opts.segments?.get(asset.id);
+    const stored = opts.segments?.get(asset.id);
+    // the reel opens on this video, so it opens on its strongest moment, not on its first one
+    const segments =
+      stored && assetIndex === 0 && stored.length > 1
+        ? [...stored].sort((a, b) => b.score - a.score).slice(0, 1).concat(
+            [...stored].sort((a, b) => b.score - a.score).slice(1).sort((a, b) => a.srcIn - b.srcIn),
+          )
+        : stored;
     if (segments?.length) {
       // a lone video carries the whole reel, so it may spend more shots than one of several
       const budget = Math.max(1, Math.round(target / Math.max(1.2, spec.maxClip) / Math.max(1, videos)));
       const want = Math.min(segments.length, Math.max(2, budget), shotsFor(asset.srcDuration, spec.maxClip));
       for (const seg of segments.slice(0, want)) {
-        out.push({ asset, srcIn: seg.srcIn, maxLen: Math.max(spec.minClip, seg.duration) });
+        out.push({ asset, srcIn: seg.srcIn, maxLen: Math.max(spec.minClip, seg.duration), spoken: seg.spoken });
       }
-      continue;
+      return;
     }
     out.push({ asset, srcIn: 0, maxLen: asset.srcDuration || spec.maxVideoClip });
-  }
+  });
   return out;
 }
 
@@ -130,6 +139,7 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
       effect: rollEffect(rng, spec, isVideo),
       transition: rollTransition(rng, spec, index),
       grade: 'none',
+      ...(source.spoken ? { spoken: true } : {}),
     });
     cursor += length;
   };
@@ -213,6 +223,7 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
     fontId,
     styleId,
     enhance: opts.enhance ?? idleEnhance(),
+    sourceVolume: 1,
   };
 }
 

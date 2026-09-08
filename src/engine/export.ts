@@ -1,3 +1,5 @@
+import { attachMusic, mixedStream } from './mixer';
+
 const MIME_CANDIDATES = [
   'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
   'video/mp4',
@@ -5,29 +7,6 @@ const MIME_CANDIDATES = [
   'video/webm;codecs=vp8,opus',
   'video/webm',
 ];
-
-interface AudioTap {
-  stream: MediaStream;
-}
-
-/**
- * createMediaElementSource can only run once per element, and closing its AudioContext
- * mutes the element for good — so the graph is built once and reused on later exports.
- */
-const taps = new WeakMap<HTMLAudioElement, AudioTap>();
-
-function audioTap(el: HTMLAudioElement): AudioTap {
-  const cached = taps.get(el);
-  if (cached) return cached;
-  const ctx = new AudioContext();
-  const src = ctx.createMediaElementSource(el);
-  const dest = ctx.createMediaStreamDestination();
-  src.connect(dest);
-  src.connect(ctx.destination);
-  const tap: AudioTap = { stream: dest.stream };
-  taps.set(el, tap);
-  return tap;
-}
 
 export function pickMime(): string {
   for (const m of MIME_CANDIDATES) {
@@ -43,6 +22,7 @@ export function extensionFor(mime: string): string {
 export interface RecordOptions {
   canvas: HTMLCanvasElement;
   fps: number;
+  /** Music track, routed through the shared mixer along with the video sound. */
   audio?: HTMLAudioElement | null;
   bitrate?: number;
   /** Drives playback; the recorder stops when it resolves. */
@@ -56,13 +36,11 @@ export async function recordCanvas(opts: RecordOptions): Promise<{ blob: Blob; m
 
   const stream = opts.canvas.captureStream(opts.fps);
 
-  if (opts.audio) {
-    try {
-      const tap = audioTap(opts.audio);
-      for (const track of tap.stream.getAudioTracks()) stream.addTrack(track);
-    } catch {
-      /* element already routed elsewhere: export video only */
-    }
+  // the mixer already carries the music and the audio of every video asset
+  if (opts.audio) attachMusic(opts.audio);
+  const mixed = mixedStream();
+  if (mixed) {
+    for (const track of mixed.getAudioTracks()) stream.addTrack(track);
   }
 
   const rec = new MediaRecorder(stream, {

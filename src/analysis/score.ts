@@ -1,6 +1,7 @@
 import type { Project } from '../types';
 import type { MediaStats } from './frames';
 import { SAFE, totalDuration } from '../engine/render';
+import { styleById } from '../data/typography';
 import { t } from '../i18n';
 
 export type FactorId = 'hook' | 'duration' | 'pace' | 'format' | 'text' | 'quality' | 'loop';
@@ -48,7 +49,29 @@ function bell(v: number, min: number, lo: number, hi: number, max: number): numb
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
-export function scoreProject(project: Project, media: MediaStats): ScoreResult {
+export interface ScoreContext {
+  /** Beat grid of the music, in timeline seconds. */
+  beats?: number[];
+  /** A music track is loaded. */
+  music?: boolean;
+}
+
+/** Relative luminance of a hex or rgba() colour, 0..1. Unknown colours read as mid grey. */
+function colorLuma(color: string): number {
+  const hex = /^#([0-9a-f]{6})$/i.exec(color.trim());
+  if (hex) {
+    const n = parseInt(hex[1]!, 16);
+    return (((n >> 16) & 255) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114) / 255;
+  }
+  const rgb = /rgba?\(([^)]+)\)/i.exec(color);
+  if (rgb) {
+    const [r = 128, g = 128, b = 128] = rgb[1]!.split(',').map((v) => Number(v.trim()));
+    return (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+  }
+  return 0.5;
+}
+
+export function scoreProject(project: Project, media: MediaStats, audio: ScoreContext = {}): ScoreResult {
   const duration = totalDuration(project);
   const cuts = Math.max(0, project.clips.length - 1);
   const avgShot = project.clips.length ? duration / project.clips.length : 0;
@@ -82,12 +105,18 @@ export function scoreProject(project: Project, media: MediaStats): ScoreResult {
   // 2. Duration (15)
   const durScore = bell(duration, 2, 7, 21, 60) * 15;
 
-  // 3. Pace (15)
+  // 3. Pace (15) — length, movement, and whether the cuts land on the music and the voice
+  const cutTimes = project.clips.slice(1).map((c) => c.start);
+  const onBeat = audio.beats?.length
+    ? cutTimes.filter((c) => audio.beats!.some((b) => Math.abs(b - c) < 0.14)).length / Math.max(1, cutTimes.length)
+    : 0;
+  const spokenCuts = project.clips.filter((c) => c.spoken).length / Math.max(1, project.clips.length);
   let paceScore = 0;
   if (cuts === 0) {
     paceScore = clamp01(media.motion * 2.2) * 8;
   } else {
-    paceScore = bell(avgShot, 0.2, 0.8, 2.6, 6) * 12 + clamp01(media.motion * 2) * 3;
+    const sync = audio.beats?.length ? onBeat : spokenCuts;
+    paceScore = bell(avgShot, 0.2, 0.8, 2.6, 6) * 10 + clamp01(media.motion * 2) * 2 + clamp01(sync) * 3;
   }
 
   // 4. Format (10)
@@ -95,12 +124,26 @@ export function scoreProject(project: Project, media: MediaStats): ScoreResult {
   const outside = project.texts.filter((t) => t.y < SAFE.top || t.y > 1 - SAFE.bottom).length;
   const formatScore = Math.max(0, aspectScore - outside * 2);
 
-  // 5. Text (15)
+  // 5. Text (15) — presence, size, dwell time and whether it can be read over the picture
   let textScore = 0;
-  if (others.length >= 1) textScore += 5;
-  if (project.texts.every((t) => t.size >= 48) && project.texts.length) textScore += 4;
-  if (project.texts.length && project.texts.every((t) => t.end - t.start >= 1.2)) textScore += 3;
+  if (others.length >= 1) textScore += 4;
+  if (project.texts.every((t) => t.size >= 48) && project.texts.length) textScore += 3;
+  if (project.texts.length && project.texts.every((t) => t.end - t.start >= 1.2)) textScore += 2;
   textScore += clamp01(textCoverage / 0.35) * 3;
+
+  let legibility = 1;
+  if (project.texts.length) {
+    const scores = project.texts.map((overlay) => {
+      const style = styleById(overlay.styleId);
+      // a box or a heavy outline carries its own contrast with it
+      if (style.bg || (style.stroke && (style.strokeWidth ?? 0) >= 0.12)) return 1;
+      const clip = project.clips.find((c) => overlay.start >= c.start && overlay.start < c.start + c.duration);
+      const behind = media.perClip.find((c) => c.clipId === clip?.id)?.stats.luma ?? g.luma;
+      return clamp01(Math.abs(colorLuma(style.fill) - behind) / 0.45);
+    });
+    legibility = scores.reduce((a, b) => a + b, 0) / scores.length;
+  }
+  textScore += legibility * 3;
 
   // 6. Visual quality (15)
   const qualityScore =
@@ -123,6 +166,9 @@ export function scoreProject(project: Project, media: MediaStats): ScoreResult {
         `${cuts} ${t('detail.cuts')}`,
         `${round1(avgShot)}s ${t('detail.perShot')}`,
         `${t('detail.motion')} ${round1(media.motion * 100)}%`,
+        audio.beats?.length
+          ? `${Math.round(onBeat * 100)}% ${t('detail.onBeat')}`
+          : `${Math.round(spokenCuts * 100)}% ${t('detail.onVoice')}`,
       ],
     },
     { id: 'format', score: formatScore, max: 10, detail: [project.aspect] },
@@ -133,6 +179,7 @@ export function scoreProject(project: Project, media: MediaStats): ScoreResult {
       detail: [
         `${project.texts.length} ${t('detail.texts')}`,
         `${Math.round(textCoverage * 100)}% ${t('detail.coverage')}`,
+        `${Math.round(legibility * 100)}% ${t('detail.legible')}`,
       ],
     },
     {
@@ -167,6 +214,9 @@ export function scoreProject(project: Project, media: MediaStats): ScoreResult {
   if (project.aspect !== '9:16') push('tip.format.aspect', 'format', 10 - formatScore, ['meta-reels', 'yt-shorts']);
   if (others.length === 0) push('tip.text.none', 'text', 5, ['meta-captions', 'yt-shorts']);
   if (textCoverage < 0.3) push('tip.text.coverage', 'text', 3, ['meta-captions']);
+  if (legibility < 0.6) push('tip.text.contrast', 'text', (1 - legibility) * 3, ['meta-captions']);
+  if (audio.beats?.length && cuts > 1 && onBeat < 0.4) push('tip.pace.offbeat', 'pace', (1 - onBeat) * 3, ['tiktok-cc']);
+  if (!audio.music && !project.clips.some((c) => c.spoken)) push('tip.audio.none', 'pace', 2, ['tiktok-cc']);
   if (g.luma < 0.32) push('tip.quality.dark', 'quality', 5, ['meta-reels']);
   else if (g.luma > 0.72) push('tip.quality.bright', 'quality', 3, ['meta-reels']);
   if (g.sharpness < 0.25) push('tip.quality.soft', 'quality', 3, ['meta-reels']);

@@ -10,6 +10,8 @@ export const SIZES: Record<Aspect, [number, number]> = {
 
 /** Safe zones: fraction of the frame reserved by the platform UI (Meta / TikTok overlays). */
 export const SAFE = { top: 0.14, bottom: 0.2, side: 0.06 };
+
+const clampRange = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 export const TRANSITION_DUR = 0.32;
 
 export type Resolve = (id: string) => MediaAsset | undefined;
@@ -225,6 +227,7 @@ export class ReelRenderer {
     alpha: number,
     gradeId = 'none',
     extra?: Motion,
+    focus?: { x: number; y: number },
   ): void {
     const { ctx } = this;
     const dw = this.canvas.width;
@@ -248,8 +251,12 @@ export class ReelRenderer {
     const scale = Math.max(dw / sw, dh / sh) * m.zoom;
     const w = sw * scale;
     const h = sh * scale;
-    const x = (dw - w) / 2 + m.panX * ((w - dw) / 2);
-    const y = (dh - h) / 2 + m.panY * ((h - dh) / 2);
+    // a horizontal video cropped to 9:16 loses most of its width, so the crop starts on the
+    // subject instead of on the middle of the frame; the effect's pan still moves from there
+    const baseX = focus ? clampRange(dw / 2 - focus.x * w, dw - w, 0) : (dw - w) / 2;
+    const baseY = focus ? clampRange(dh / 2 - focus.y * h, dh - h, 0) : (dh - h) / 2;
+    const x = clampRange(baseX + m.panX * ((w - dw) / 2), Math.min(0, dw - w), Math.max(0, dw - w));
+    const y = clampRange(baseY + m.panY * ((h - dh) / 2), Math.min(0, dh - h), Math.max(0, dh - h));
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -506,7 +513,7 @@ export class ReelRenderer {
       if (asset) {
         ctx.save();
         const alpha = this.applyIncoming(def, tp, raw);
-        this.drawMedia(asset, clip.effect, p, t, alpha, clip.grade ?? 'none', extra);
+        this.drawMedia(asset, clip.effect, p, t, alpha, clip.grade ?? 'none', extra, clip.focus);
         ctx.restore();
         if (raw < 1) this.drawOverlayPhase(def, tp, raw);
       }
