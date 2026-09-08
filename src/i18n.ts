@@ -30,12 +30,13 @@ export const SOURCES: Source[] = [
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  'media.title.transcribe': 'Vídeo a transcribir',
+  'media.title.boost': 'Tu vídeo ya editado',
+  'media.title.build': 'Tus fotos y vídeos',
+  'media.title.multi': 'Tu vídeo largo',
+  'menu.back': 'Menú',
   'welcome.title': '¿Qué quieres hacer?',
   'welcome.sub': 'Elige una opción. Todo ocurre en tu móvil u ordenador.',
-  'step.1': 'Material',
-  'step.2': 'Ajustes',
-  'step.3': 'Resultado',
-  'step.next': 'Siguiente',
   'group.advanced': 'Opciones avanzadas',
   'app.tagline': 'Editor rápido de reels + score de viralidad',
   'lang.label': 'Idioma',
@@ -335,12 +336,13 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  'media.title.transcribe': 'Video to transcribe',
+  'media.title.boost': 'Your finished video',
+  'media.title.build': 'Your photos and videos',
+  'media.title.multi': 'Your long video',
+  'menu.back': 'Menu',
   'welcome.title': 'What do you want to do?',
   'welcome.sub': 'Pick one. Everything runs on your phone or computer.',
-  'step.1': 'Material',
-  'step.2': 'Settings',
-  'step.3': 'Result',
-  'step.next': 'Next',
   'group.advanced': 'Advanced options',
   'app.tagline': 'Fast reel editor + virality score',
   'lang.label': 'Language',
@@ -640,12 +642,13 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'media.title.transcribe': 'Vidéo à transcrire',
+  'media.title.boost': 'Votre vidéo déjà montée',
+  'media.title.build': 'Vos photos et vidéos',
+  'media.title.multi': 'Votre vidéo longue',
+  'menu.back': 'Menu',
   'welcome.title': 'Que voulez-vous faire ?',
   'welcome.sub': 'Choisissez une option. Tout se passe sur votre appareil.',
-  'step.1': 'Contenu',
-  'step.2': 'Réglages',
-  'step.3': 'Résultat',
-  'step.next': 'Suivant',
   'group.advanced': 'Options avancées',
   'app.tagline': 'Montage rapide de reels + score de viralité',
   'lang.label': 'Langue',
@@ -945,12 +948,13 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  'media.title.transcribe': 'Video zum Transkribieren',
+  'media.title.boost': 'Dein fertiges Video',
+  'media.title.build': 'Deine Fotos und Videos',
+  'media.title.multi': 'Dein langes Video',
+  'menu.back': 'Menü',
   'welcome.title': 'Was möchtest du machen?',
   'welcome.sub': 'Wähle eine Option. Alles läuft auf deinem Gerät.',
-  'step.1': 'Material',
-  'step.2': 'Einstellungen',
-  'step.3': 'Ergebnis',
-  'step.next': 'Weiter',
   'group.advanced': 'Erweiterte Optionen',
   'app.tagline': 'Schneller Reel-Editor + Viralitäts-Score',
   'lang.label': 'Sprache',
@@ -1250,12 +1254,13 @@ const de: Dict = {
 };
 
 const it: Dict = {
+  'media.title.transcribe': 'Video da trascrivere',
+  'media.title.boost': 'Il tuo video già montato',
+  'media.title.build': 'Le tue foto e i tuoi video',
+  'media.title.multi': 'Il tuo video lungo',
+  'menu.back': 'Menu',
   'welcome.title': 'Cosa vuoi fare?',
   'welcome.sub': 'Scegli un’opzione. Tutto avviene sul tuo dispositivo.',
-  'step.1': 'Materiale',
-  'step.2': 'Impostazioni',
-  'step.3': 'Risultato',
-  'step.next': 'Avanti',
   'group.advanced': 'Opzioni avanzate',
   'app.tagline': 'Editor rapido di reel + punteggio di viralità',
   'lang.label': 'Lingua',

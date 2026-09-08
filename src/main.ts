@@ -89,44 +89,29 @@ function shell(): string {
     </label>
   </header>
 
-  <section class="welcome" id="welcome">
+  <section class="hub" id="hub">
     <h1 data-i18n="welcome.title"></h1>
     <p data-i18n="welcome.sub"></p>
-    <div class="welcome__cards">
-      ${SECTIONS.filter((id) => id !== 'boost' || true)
-        .map(
-          (id) => `<button class="wcard" data-section="${id}">
-            ${SECTION_ICON[id]}
-            <strong data-i18n="section.${id}"></strong>
-            <small data-i18n="section.${id}.sub"></small>
-          </button>`,
-        )
-        .join('')}
-    </div>
-    <p class="welcome__note" data-i18n="footer.privacy"></p>
-  </section>
-
-  <nav class="sections" id="sections" role="tablist" aria-label="secciones">
-    ${SECTIONS.map(
-      (id) => `<button role="tab" data-section="${id}" aria-selected="${id === 'transcribe'}">
-        ${SECTION_ICON[id]}
-        <span>
+    <div class="hub__cards">
+      ${SECTIONS.map(
+        (id) => `<button class="hcard" data-section="${id}">
+          ${SECTION_ICON[id]}
           <strong data-i18n="section.${id}"></strong>
           <small data-i18n="section.${id}.sub"></small>
-        </span>
-      </button>`,
-    ).join('')}
-  </nav>
+        </button>`,
+      ).join('')}
+    </div>
+    <p class="hub__note" data-i18n="footer.privacy"></p>
+  </section>
 
-  <ol class="steps-bar" id="stepsBar">
-    <li data-step="1"><span>1</span><em data-i18n="step.1"></em></li>
-    <li data-step="2"><span>2</span><em data-i18n="step.2"></em></li>
-    <li data-step="3"><span>3</span><em data-i18n="step.3"></em></li>
-  </ol>
+  <div class="toolbar" id="toolbar">
+    <button class="btn btn--ghost btn--sm" id="toMenu">${icons.up}<span data-i18n="menu.back"></span></button>
+    <h1 class="toolbar__title"><span id="toolIcon"></span><span id="toolName"></span></h1>
+  </div>
 
   <main class="layout">
     <section class="panel panel--media" aria-label="media" id="panel-media">
-      <h2 class="panel__title" data-i18n="nav.media"></h2>
+      <h2 class="panel__title" id="mediaTitle"></h2>
       <div class="dropzone" id="drop">
         <h3 data-i18n="drop.title"></h3>
         <p data-i18n="drop.hint"></p>
@@ -150,9 +135,6 @@ function shell(): string {
         <span class="empty-note" id="mediaCount"></span>
         <button class="btn btn--ghost btn--sm" id="clear">${icons.trash}<span data-i18n="media.clear"></span></button>
       </div>
-      <button class="btn btn--primary btn--next" id="toStep2" disabled>
-        <span data-i18n="step.next"></span>${icons.down}
-      </button>
     </section>
 
     <section class="panel panel--transcript" aria-label="transcript" id="panel-transcript">
@@ -1035,38 +1017,24 @@ async function exportVideo(): Promise<void> {
 }
 
 
-/* ---------- the three-step flow ---------- */
+/* ---------- the menu and the tool screens ---------- */
 
-type Step = 1 | 2 | 3;
-
-/** Moves the flow, keeping the body attributes that drive what is on screen. */
-function setStep(next: Step): void {
-  document.body.dataset.step = String(next);
-  for (const item of Array.from(document.querySelectorAll<HTMLElement>('#stepsBar [data-step]'))) {
-    const n = Number(item.dataset.step);
-    item.setAttribute('aria-current', String(n === next));
-    item.classList.toggle('is-done', n < next);
+/** The menu is a real screen you can always come back to, not a first-run splash. */
+function setView(view: 'menu' | 'tool'): void {
+  document.body.dataset.view = view;
+  if (view === 'menu') {
+    history.replaceState(null, '', location.pathname);
+    localStorage.removeItem('mai-reel-section');
   }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  syncFlowState();
+  window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
-/** Enables or disables what the current step allows, so nothing dead is ever clickable. */
+/** Marks what the screen already has, so empty controls never sit there looking broken. */
 function syncFlowState(): void {
   const hasMedia = state.assets.length > 0 || Boolean(pendingLink) || Boolean(state.audio);
   const hasResult = state.project.clips.length > 0 || cues.length > 0;
-  $<HTMLButtonElement>('toStep2').disabled = !hasMedia;
-  for (const item of Array.from(document.querySelectorAll<HTMLElement>('#stepsBar [data-step]'))) {
-    const n = Number(item.dataset.step);
-    const reachable = n === 1 || (n === 2 && hasMedia) || (n === 3 && hasResult);
-    item.classList.toggle('is-locked', !reachable);
-  }
-}
-
-/** First run shows only the question "what do you want to do"; picking an answer starts a flow. */
-function leaveWelcome(): void {
-  document.body.dataset.welcome = 'off';
-  localStorage.setItem('mai-reel-welcome', 'off');
+  document.body.dataset.media = hasMedia ? '1' : '0';
+  document.body.dataset.result = hasResult ? '1' : '0';
 }
 
 /* ---------- tabs ---------- */
@@ -1762,7 +1730,6 @@ async function runTranscription(): Promise<void> {
     renderTranscript();
     activeCue = -1;
     highlightCue();
-    if (cues.length) setStep(3);
     label.textContent = `${cues.length} ${t('asr.blocks')}`;
     if (!cues.length) toast(t('asr.empty'));
     else if (totalDuration(state.project) > 0.2) applyCues();
@@ -1886,7 +1853,6 @@ async function autoEdit(): Promise<void> {
     lastReasons = result.reasons;
     lastNotes = result.notes ?? [];
     renderReasons();
-    setStep(3);
     player.seek(0);
     updateTransport();
     renderTicks();
@@ -1927,23 +1893,20 @@ async function setMode(mode: ReelMode): Promise<void> {
   }
 
   await analyseSource(video, mode);
-  if (mode === 'viral') {
-    applyViral(video, 0, video.srcDuration || sourceAudio?.duration || 15);
-    setStep(3);
-  } else renderHighlights();
+  if (mode === 'viral') applyViral(video, 0, video.srcDuration || sourceAudio?.duration || 15);
+  else renderHighlights();
 }
 
 /** Sections are the top-level navigation: each one shows only the panels it needs. */
 async function setSection(section: Section, remember = true): Promise<void> {
   document.body.dataset.section = section;
-  for (const btn of Array.from(document.querySelectorAll<HTMLElement>('#sections [data-section]'))) {
-    btn.setAttribute('aria-selected', String(btn.dataset.section === section));
-  }
+  $('toolName').textContent = t(`section.${section}`);
+  $('mediaTitle').textContent = t(`media.title.${section}`);
+  $('toolIcon').innerHTML = SECTION_ICON[section];
   if (remember) {
     localStorage.setItem('mai-reel-section', section);
     if (location.hash.slice(1) !== section) history.replaceState(null, '', `#${section}`);
-    leaveWelcome();
-    setStep(state.assets.length || state.audio ? 2 : 1);
+    setView('tool');
   }
   syncPreviewScale();
   renderTranscribePlayer();
@@ -2120,23 +2083,12 @@ $('packs').addEventListener('click', (e) => {
   if (btn) applyPack(btn.dataset.pack!);
 });
 $('auto').addEventListener('click', () => void autoEdit());
-$('welcome').addEventListener('click', (e) => {
+$('hub').addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-section]');
   if (btn) void setSection(btn.dataset.section as Section);
 });
 
-$('toStep2').addEventListener('click', () => setStep(2));
-
-$('stepsBar').addEventListener('click', (e) => {
-  const item = (e.target as HTMLElement).closest<HTMLElement>('[data-step]');
-  if (!item || item.classList.contains('is-locked')) return;
-  setStep(Number(item.dataset.step) as Step);
-});
-
-$('sections').addEventListener('click', (e) => {
-  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-section]');
-  if (btn) void setSection(btn.dataset.section as Section);
-});
+$('toMenu').addEventListener('click', () => setView('menu'));
 
 $('transcript').addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-cue]');
@@ -2200,7 +2152,6 @@ $('multiList').addEventListener('click', (e) => {
   const video = state.assets.find((a) => a.kind === 'video');
   if (!h || !video) return;
   applyViral(video, h.start, h.end - h.start);
-  setStep(3);
   for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-clip-pick]'))) {
     b.setAttribute('aria-pressed', String(b === btn));
   }
@@ -2237,10 +2188,10 @@ renderTranscribePlayer();
 $<HTMLInputElement>('extractorUrl').value = extractorUrl();
 if (hasExtractor()) $('extractorStatus').textContent = t('ext.ready');
 updateTransport();
-const seenWelcome = localStorage.getItem('mai-reel-welcome') === 'off' || Boolean(location.hash);
-document.body.dataset.welcome = seenWelcome ? 'off' : 'on';
-setStep(1);
+const openTool = Boolean(location.hash) || Boolean(localStorage.getItem('mai-reel-section'));
+document.body.dataset.view = openTool ? 'tool' : 'menu';
 void setSection(firstSection, false);
+syncFlowState();
 window.addEventListener('hashchange', () => {
   const next = location.hash.slice(1) as Section;
   if (SECTIONS.includes(next) && next !== document.body.dataset.section) void setSection(next, false);

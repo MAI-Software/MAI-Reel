@@ -1383,72 +1383,37 @@ body[data-mode='multi'] .panel--edit > .empty-note:last-child {
   font-style: italic;
 }
 
-/* ---------- sections: the top level navigation ---------- */
+/* ---------- the bar that names the open tool and leads back to the menu ---------- */
 
-.sections {
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-  padding: 8px 12px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 10px 12px 0;
 }
 
-.sections button {
+.toolbar__title {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 56px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--fg-dim);
-  text-align: left;
-  transition: border-color 160ms ease-out, background 160ms ease-out, color 160ms ease-out;
+  margin: 0;
+  font-size: 17px;
 }
 
-.sections button:hover {
-  background: var(--surface-2);
-}
-
-.sections button[aria-selected='true'] {
-  border-color: var(--primary);
-  background: var(--surface-2);
-  color: var(--fg);
-}
-
-.sections button[aria-selected='true'] svg {
+.toolbar__title svg {
+  width: 20px;
+  height: 20px;
   color: var(--primary);
 }
 
-.sections svg {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 auto;
+#toMenu svg {
+  transform: rotate(-90deg);
 }
 
-.sections span {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.2;
-}
-
-.sections strong {
-  font-size: 14px;
-}
-
-.sections small {
-  font-size: 11px;
-  color: var(--fg-faint);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* nothing is mounted until the section and the step both ask for it */
+/* each tool mounts its own panels and nothing else */
 .panel--media,
 .panel--transcript,
 .panel--boost,
@@ -1460,34 +1425,63 @@ body[data-mode='multi'] .panel--edit > .empty-note:last-child {
   display: none;
 }
 
-/* step 1: what am I working with */
-body[data-step='1'] .panel--media {
+body[data-view='tool'][data-section='transcribe'] .panel--media,
+body[data-view='tool'][data-section='transcribe'] .panel--transcript,
+body[data-view='tool'][data-section='boost'] .panel--media,
+body[data-view='tool'][data-section='boost'] .panel--boost,
+body[data-view='tool'][data-section='boost'] .stage,
+body[data-view='tool'][data-section='boost'] .panel--score,
+body[data-view='tool'][data-section='boost'] .panel--blocks,
+body[data-view='tool'][data-section='build'] .panel--media,
+body[data-view='tool'][data-section='build'] .panel--edit,
+body[data-view='tool'][data-section='build'] .stage,
+body[data-view='tool'][data-section='build'] .panel--score,
+body[data-view='tool'][data-section='build'] .panel--blocks,
+body[data-view='tool'][data-section='multi'] .panel--media,
+body[data-view='tool'][data-section='multi'] .panel--multi,
+body[data-view='tool'][data-section='multi'] .stage,
+body[data-view='tool'][data-section='multi'] .panel--score {
   display: flex;
 }
 
-/* step 2: how do I want it */
-body[data-step='2'][data-section='transcribe'] .panel--transcript,
-body[data-step='2'][data-section='boost'] .panel--boost,
-body[data-step='2'][data-section='build'] .panel--edit,
-body[data-step='2'][data-section='multi'] .panel--multi,
-/* step 3: here it is */
-body[data-step='3'][data-section='transcribe'] .panel--transcript,
-body[data-step='3'][data-section='boost'] .stage,
-body[data-step='3'][data-section='boost'] .panel--score,
-body[data-step='3'][data-section='boost'] .panel--blocks,
-body[data-step='3'][data-section='build'] .stage,
-body[data-step='3'][data-section='build'] .panel--score,
-body[data-step='3'][data-section='build'] .panel--blocks,
-body[data-step='3'][data-section='multi'] .panel--multi,
-body[data-step='3'][data-section='multi'] .stage,
-body[data-step='3'][data-section='multi'] .panel--score {
-  display: flex;
+/* material, then the controls that act on it, then what came out */
+.panel--media {
+  order: 0;
 }
 
-/* the preview is worth seeing while the settings are being touched */
-body[data-step='2'][data-section='boost'] .stage,
-body[data-step='2'][data-section='build'] .stage {
-  display: flex;
+.panel--transcript,
+.panel--boost,
+.panel--multi,
+.panel--edit {
+  order: 1;
+}
+
+.stage {
+  order: 2;
+}
+
+.panel--score {
+  order: 3;
+}
+
+.panel--blocks {
+  order: 4;
+}
+
+/* pasting a link only makes sense where a link can be read */
+body:not([data-section='transcribe']) .linkbox {
+  display: none;
+}
+
+/* the import box shrinks once there is something to work with */
+body[data-media='1'] .dropzone {
+  padding: 8px;
+  min-height: 0;
+}
+
+body[data-media='1'] .dropzone h3,
+body[data-media='1'] .dropzone p {
+  display: none;
 }
 
 .cues {
@@ -1621,9 +1615,9 @@ body[data-step='2'][data-section='build'] .stage {
 /* ---------- responsive overrides (kept last so they win by order) ---------- */
 
 
-/* ---------- welcome: the single question that starts everything ---------- */
+/* ---------- the menu: every tool, one tap away ---------- */
 
-.welcome {
+.hub {
   display: none;
   flex-direction: column;
   align-items: center;
@@ -1632,30 +1626,29 @@ body[data-step='2'][data-section='build'] .stage {
   text-align: center;
 }
 
-body[data-welcome='on'] .welcome {
+body[data-view='menu'] .hub {
   display: flex;
 }
 
-body[data-welcome='on'] .sections,
-body[data-welcome='on'] .steps-bar,
-body[data-welcome='on'] .layout {
+body[data-view='menu'] .toolbar,
+body[data-view='menu'] .layout {
   display: none;
 }
 
-.welcome h1 {
+.hub h1 {
   margin: 0;
   font-size: clamp(23px, 5vw, 32px);
   line-height: 1.15;
 }
 
-.welcome > p {
+.hub > p {
   margin: 0;
   max-width: 46ch;
   color: var(--fg-dim);
   font-size: 15px;
 }
 
-.welcome__cards {
+.hub__cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 12px;
@@ -1664,7 +1657,7 @@ body[data-welcome='on'] .layout {
   margin-top: 14px;
 }
 
-.wcard {
+.hcard {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -1679,101 +1672,35 @@ body[data-welcome='on'] .layout {
   transition: border-color 160ms ease-out, background 160ms ease-out, transform 160ms ease-out;
 }
 
-.wcard:hover {
+.hcard:hover {
   border-color: var(--primary);
   background: var(--surface-2);
   transform: translateY(-2px);
 }
 
-.wcard svg {
+.hcard svg {
   width: 26px;
   height: 26px;
   color: var(--primary);
 }
 
-.wcard strong {
+.hcard strong {
   font-size: 17px;
 }
 
-.wcard small {
+.hcard small {
   font-size: 13px;
   line-height: 1.35;
   color: var(--fg-dim);
 }
 
-.welcome__note {
+.hub__note {
   margin: 10px 0 0;
   font-size: 12px;
   color: var(--fg-faint);
 }
 
-/* ---------- the three steps, always visible so nobody gets lost ---------- */
-
-.steps-bar {
-  display: flex;
-  gap: 6px;
-  width: 100%;
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 10px 12px 0;
-  list-style: none;
-}
-
-.steps-bar li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--fg-faint);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.steps-bar li span {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--surface-2);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.steps-bar li em {
-  overflow: hidden;
-  font-style: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.steps-bar li[aria-current='true'] {
-  border-color: var(--primary);
-  color: var(--fg);
-}
-
-.steps-bar li[aria-current='true'] span {
-  background: var(--primary);
-  color: #fff;
-}
-
-.steps-bar li.is-done span {
-  background: var(--accent);
-  color: #fff;
-}
-
-.steps-bar li.is-locked {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-/* ---------- one obvious action per screen ---------- */
+/* ---------- one obvious action per tool ---------- */
 
 .btn--hero {
   width: 100%;
@@ -1782,34 +1709,15 @@ body[data-welcome='on'] .layout {
   font-weight: 700;
 }
 
-.btn--next {
-  width: 100%;
-  min-height: 48px;
-  margin-top: 2px;
-}
-
-.btn--next[disabled] {
-  opacity: 0.4;
-}
-
 .stage__toggle {
   align-self: center;
 }
 
-/* exporting belongs to the result screen only */
-body:not([data-step='3']) .stage__actions,
-body:not([data-step='3']) .stage__toggle,
-body:not([data-step='3']) .stage > .empty-note {
+/* exporting only exists once there is something to export */
+body[data-result='0'] .stage__actions,
+body[data-result='0'] .stage__toggle,
+body[data-result='0'] .stage > .empty-note {
   display: none;
-}
-
-/* the score answers "is it any good"; the shot list is for whoever wants to tweak */
-.panel--score {
-  order: 0;
-}
-
-.panel--blocks {
-  order: 1;
 }
 
 @media (max-width: 1023px) {
@@ -2014,21 +1922,11 @@ body:not([data-step='3']) .stage > .empty-note {
     display: none;
   }
   .layout {
-    grid-template-columns: 330px minmax(0, 1fr) 390px;
     align-items: stretch;
   }
-  .col--left {
-    grid-column: 1;
-  }
+  /* on a wide screen the preview sits next to the material instead of below it */
   .stage {
     order: 0;
-    grid-column: 2;
-  }
-  .col--right {
-    grid-column: 3;
-  }
-  body[data-tab] .panel {
-    display: flex;
   }
   .panel.panel--blocks {
     flex: 1 1 58%;
@@ -2220,28 +2118,27 @@ body[data-view='all'] .col {
 }
 
 @media (max-width: 1023px) {
-  /* two rows of section cards instead of four cramped columns */
-  .sections {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-    padding: 6px 8px;
-    position: sticky;
-    top: var(--header-h, 55px);
-    z-index: 35;
+  .hub {
+    padding: 20px 12px 32px;
   }
 
-  .sections button {
-    min-height: 48px;
-    padding: 6px 8px;
+  .hub__cards {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
-  .sections small {
-    display: none;
+  .hcard {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .toolbar {
+    padding: 8px 8px 0;
   }
 
   .stage {
     position: sticky;
-    top: calc(var(--header-h, 55px) + 118px);
+    top: calc(var(--header-h, 55px) + 48px);
     z-index: 20;
     background: var(--bg);
   }
