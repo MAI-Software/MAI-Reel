@@ -1,7 +1,7 @@
 // MAI-Reel service worker: offline shell + runtime cache for the hashed build assets.
 // The Whisper weights are NOT cached here: transformers.js keeps them in its own Cache
 // Storage bucket, and duplicating ~85 MB would blow past the browser quota.
-const VERSION = 'mai-reel-v1';
+const VERSION = 'mai-reel-v2';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -35,8 +35,11 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(VERSION).then((cache) => cache.put('/index.html', copy));
+          // only the app shell refreshes the offline copy: a landing page must not replace it
+          if (url.pathname === '/' || url.pathname === '/index.html') {
+            const copy = response.clone();
+            caches.open(VERSION).then((cache) => cache.put('/index.html', copy));
+          }
           return response;
         })
         .catch(() => caches.match('/index.html').then((hit) => hit ?? caches.match('/'))),
