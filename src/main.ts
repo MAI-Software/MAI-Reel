@@ -174,6 +174,7 @@ function shell(): string {
           </div>
           <span class="empty-note" id="captureStatus"></span>
         </div>
+        <span class="empty-note" id="linkNoPath" hidden data-i18n="link.nopath"></span>
       </div>
       <span class="empty-note" data-i18n="asr.hint"></span>
       <div id="transcript"></div>
@@ -1675,7 +1676,10 @@ function refreshLinkJob(): void {
   const show = Boolean(pendingLink) && hasExtractor();
   $('linkJobBox').hidden = !show;
   // with a server the tab capture is only the fallback, so it steps aside
-  $('captureBox').hidden = !pendingLink || show || !isCaptureSupported();
+  const capture = Boolean(pendingLink) && !show && isCaptureSupported();
+  $('captureBox').hidden = !capture;
+  // a phone has neither path: say so instead of leaving the embed sitting there
+  $('linkNoPath').hidden = !pendingLink || show || capture;
 }
 
 /** One button: subtitles from the platform when they exist, audio + Whisper when they do not. */

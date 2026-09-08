@@ -4,9 +4,9 @@ Editor web de reels rápido y automático, optimizado para móvil y escritorio. 
 
 Todo el procesamiento ocurre en el navegador: ningún archivo se sube a ningún servidor.
 
-## Cuatro secciones
+## Menú y herramientas
 
-La navegación principal son cuatro secciones; cada una muestra solo lo que necesita.
+La app abre en un **menú** con las cuatro herramientas. Al elegir una se entra en su pantalla, que monta solo sus paneles, y desde la barra superior se vuelve al menú. Nada más entrar hay un botón **Probar con un ejemplo** que genera material en el propio navegador y monta un reel completo, sin subir nada.
 
 | Sección | Para qué | Qué ve el usuario |
 |---|---|---|
@@ -16,6 +16,23 @@ La navegación principal son cuatro secciones; cada una muestra solo lo que nece
 | **Recortes** | Vídeo largo (podcast, directo, YouTube) | Duración del recorte y buscador de los mejores momentos, puntuados por voz, energía, dinámica y contexto del texto. |
 
 La sección se guarda y va en el hash (`#transcribe`, `#boost`, `#build`, `#multi`), así que se puede enlazar directamente.
+
+## Cómo corta
+
+Un vídeo importado no es un plano continuo: se mide su propia voz y se parte en varios planos.
+
+- Las frases se pegan hasta formar un plano; **toda pausa de más de 0,42 s es un corte**, así que el silencio no llega al montaje.
+- Los planos se puntúan por energía y acentos, se queda con los mejores y los deja en el orden en que se dijeron.
+- Cuando el reel sale de un solo vídeo, **abre por su mejor momento**, no por el principio.
+- Sin voz utilizable, los planos se reparten por el vídeo y se prefieren los tramos con más energía.
+
+Medido sobre un clip de 16 s que habla 2,6 s de cada 4: 4 planos en `srcIn` 0,33 / 4,38 / 8,38 / 12,38 y 12,9 s de contenido.
+
+## Sonido
+
+- El **audio del vídeo se oye y se exporta** (antes solo salía la música).
+- La música **baja al 25 % bajo los planos hablados**, en la previsualización y en el archivo final.
+- Todo pasa por un único grafo de Web Audio, así que lo que se escucha es lo que se exporta.
 
 ## Variación
 
@@ -153,9 +170,9 @@ npm run android:apk     # build web + sync + gradlew assembleDebug
 
 Esta vía sí necesita JDK 17 y el Android SDK con `ANDROID_HOME`.
 
-## Stack## Stack
+## Stack
 
-Vite + TypeScript, sin framework ni dependencias en runtime. Canvas 2D para el render, `MediaRecorder` para exportar, Web Audio para mezclar audio.
+Vite + TypeScript, sin framework. La única dependencia de runtime es `mp4-muxer` (~11 KB gzip, en su propio chunk y solo al exportar). Canvas 2D para el render, WebCodecs para exportar con `MediaRecorder` de respaldo, y Web Audio para toda la mezcla.
 
 ```bash
 npm install
@@ -171,12 +188,40 @@ Conectar el repositorio y usar:
 - Build command: `npm run build`
 - Output directory: `dist`
 
+## Exportación
+
+Con WebCodecs (Chrome, Edge y derivados) el reel se codifica **fuera de tiempo real** y se empaqueta en **MP4** (H.264 + AAC): no se pierden fotogramas y no hay que esperar la duración del vídeo. La banda sonora se mezcla aparte con `OfflineAudioContext`, con fundidos en los cortes y el mismo ducking de la previsualización. El multiplexor se descarga solo al exportar.
+
+Medido: un reel de 12 s salido de un vídeo hablado se exporta en 8,7 s a 1080×1920, con audio estéreo a 48 kHz.
+
+Sin WebCodecs se usa la vía anterior (`MediaRecorder` en tiempo real, MP4 o WebM según el navegador).
+
+En móvil, además de la descarga aparece **Compartir**, que entrega el archivo a la hoja de compartir del sistema.
+
+## Sesión, deshacer y plataformas
+
+- El material y el montaje se guardan en **IndexedDB**: al recargar sigue todo ahí. Sigue sin salir nada del dispositivo.
+- **Deshacer / rehacer** con los botones de la barra o con `Ctrl+Z` / `Ctrl+Shift+Z`.
+- **Plataforma** (genérica, TikTok, Reels, Shorts): cada una tapa una parte distinta del encuadre, así que cambia la zona segura, la posición del texto y el factor de formato del score.
+
+## SEO
+
+`npm run build` genera además ocho páginas estáticas (cuatro herramientas × ES/EN) con su propio título, texto, `canonical`, par `hreflang` y JSON-LD, más `robots.txt` y `sitemap.xml`. La app en sí sigue siendo una sola página.
+
+## Pruebas
+
+```bash
+npm test          # vitest sobre las funciones puras (segmentación, subtítulos)
+```
+
+GitHub Actions ejecuta las pruebas y el build en cada push.
+
 ## Limitaciones actuales
 
-- La exportación graba en tiempo real: un reel de 15 s tarda 15 s en generarse.
-- Un vídeo importado se usa como un único plano continuo (sin cortes internos automáticos).
 - La detección de ritmo funciona con música de pulso marcado; con audio hablado o ambiental puede no encontrar rejilla.
-- El análisis de imagen no detecta caras ni objetos; mide luz, contraste, nitidez, color y movimiento.
+- El análisis de imagen no detecta caras: el sujeto se localiza por tono de piel y por densidad de bordes, y con eso se reencuadra el recorte vertical.
+- Los tiempos por palabra dependen de que Whisper los alinee; si no puede, los subtítulos siguen siendo por bloque.
+- Sin WebCodecs la exportación vuelve a ser en tiempo real, y si la pestaña pasa a segundo plano el navegador la congela.
 
 ## Créditos
 

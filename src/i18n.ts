@@ -30,6 +30,7 @@ export const SOURCES: Source[] = [
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  'link.nopath': 'Este navegador no puede leer el sonido de otra página, así que el enlace solo se reproduce. Para transcribirlo: descarga el vídeo e impórtalo, ábrelo en Chrome o Edge de escritorio, o configura tu servidor de extracción.',
   'action.share': 'Compartir',
   'platform.label': 'Plataforma',
   'platform.generic': 'Genérica',
@@ -355,6 +356,7 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  'link.nopath': 'This browser cannot read the sound of another page, so the link only plays. To transcribe it: download the video and import it, open this on desktop Chrome or Edge, or set up your extraction server.',
   'action.share': 'Share',
   'platform.label': 'Platform',
   'platform.generic': 'Generic',
@@ -680,6 +682,7 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'link.nopath': 'Ce navigateur ne peut pas lire le son d’une autre page, le lien est donc seulement lu. Pour le transcrire : téléchargez la vidéo et importez-la, ouvrez ceci sur Chrome ou Edge de bureau, ou configurez votre serveur d’extraction.',
   'action.share': 'Partager',
   'platform.label': 'Plateforme',
   'platform.generic': 'Générique',
@@ -1005,6 +1008,7 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  'link.nopath': 'Dieser Browser kann den Ton einer anderen Seite nicht lesen, der Link wird also nur abgespielt. Zum Transkribieren: Video herunterladen und importieren, dies in Chrome oder Edge am Desktop öffnen, oder den eigenen Extraktionsserver einrichten.',
   'action.share': 'Teilen',
   'platform.label': 'Plattform',
   'platform.generic': 'Allgemein',
@@ -1330,6 +1334,7 @@ const de: Dict = {
 };
 
 const it: Dict = {
+  'link.nopath': 'Questo browser non può leggere l’audio di un’altra pagina, quindi il link viene solo riprodotto. Per trascriverlo: scarica il video e importalo, apri questa pagina su Chrome o Edge desktop, oppure configura il tuo server di estrazione.',
   'action.share': 'Condividi',
   'platform.label': 'Piattaforma',
   'platform.generic': 'Generica',
