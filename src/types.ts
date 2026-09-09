@@ -10,6 +10,8 @@ export interface MediaAsset {
   height: number;
   srcDuration: number;
   thumb?: string;
+  /** Data URL with a row of frames along the video, for the trim bar. */
+  strip?: string;
   /** Kept so the audio track can be decoded later for the entertainment mode. */
   file?: File;
 }

@@ -133,6 +133,34 @@ export async function thumbnail(asset: MediaAsset, size = 160): Promise<string> 
   return c.toDataURL('image/jpeg', 0.7);
 }
 
+/**
+ * A strip of frames along a video, used as the background of the trim bar: seeing the footage
+ * is the difference between guessing a cut and choosing one.
+ */
+export async function filmstrip(asset: MediaAsset, frames = 6, height = 48): Promise<string> {
+  if (asset.kind !== 'video' || !asset.srcDuration) return '';
+  const video = asset.el as HTMLVideoElement;
+  const ratio = asset.height ? asset.width / asset.height : 0.5625;
+  const width = Math.max(12, Math.round(height * ratio));
+  const c = document.createElement('canvas');
+  c.width = width * frames;
+  c.height = height;
+  const ctx = c.getContext('2d')!;
+  const was = video.currentTime;
+
+  for (let i = 0; i < frames; i++) {
+    const at = ((i + 0.5) / frames) * asset.srcDuration;
+    await seek(video, at);
+    try {
+      ctx.drawImage(video, i * width, 0, width, height);
+    } catch {
+      /* a frame that will not draw leaves a gap, which is better than failing the strip */
+    }
+  }
+  await seek(video, was);
+  return c.toDataURL('image/jpeg', 0.6);
+}
+
 export function seek(v: HTMLVideoElement, time: number): Promise<void> {
   return new Promise((resolve) => {
     const target = Math.max(0, Math.min(time, (v.duration || 0) - 0.05));

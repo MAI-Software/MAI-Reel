@@ -21,6 +21,8 @@ La sección se guarda y va en el hash (`#transcribe`, `#boost`, `#build`, `#mult
 
 En **Crear** el material y su preparación son el mismo panel: importas todos los clips que quieras (varios a la vez, arrastrando o desde el selector) y cada uno aparece como una tarjeta con su miniatura, sus controles de **entrada y salida**, flechas para ordenarlo y una ✕ para dejarlo fuera. La miniatura se vuelve a sacar en el punto de entrada que elijas.
 
+Cada tarjeta trae la **tira de fotogramas** del vídeo con dos tiradores para recortarlo mirando el material (o con las flechas del teclado), un ▶ para verlo suelto antes de montar nada, un asa para arrastrarla y cambiarla de orden, y el botón de superponer. La duración objetivo del reel está justo encima de los botones de montar.
+
 Después hay dos caminos:
 
 - **Hacer magia** — olvida todo lo anterior (vuelve a incluir todo y quita los recortes) y deja que el montador decida duración, cortes, efectos, color y textos.
@@ -40,6 +42,18 @@ Medido sobre un clip de 16 s que habla 2,6 s de cada 4: 4 planos en `srcIn` 0,33
 ## Distribución
 
 En pantalla ancha la herramienta son dos columnas: a la izquierda lo que le das (material y preparación) y sus ajustes, a la derecha lo que sale (previsualización fija, línea de tiempo, mezcla y nota). Al seleccionar un plano en la línea de tiempo se abre debajo su **inspector** con efecto, transición, color, duración y recorte de ese plano; no hay una lista con todos los planos porque la línea de tiempo ya los enseña.
+
+## Encuadre y capas
+
+La previsualización es una superficie de trabajo:
+
+- **Arrastra** sobre ella para mover el plano dentro del encuadre y usa la **rueda o dos dedos** para el zoom. El inspector del plano trae el mismo zoom en número y un botón para centrarlo de nuevo.
+- **Superponer**: cualquier clip importado puede ir encima del reel desde su tarjeta. Aparece como recuadro con esquinas redondeadas, se arrastra y se redimensiona igual, y va **sin sonido** para no pelearse con la mezcla. Su inspector controla tamaño, momento de entrada y duración.
+- El gesto actúa sobre la capa que hay debajo del dedo: si tocas una superposición, mueves esa; si no, el plano.
+
+## Resolución
+
+`1080` (recomendada), `720` o `540`, en Ritmo y formato. Es la altura real del archivo exportado: a 540 el mismo reel sale en 540×960 y tarda menos en codificarse.
 
 ## Línea de tiempo
 

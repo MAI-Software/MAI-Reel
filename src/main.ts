@@ -2,7 +2,7 @@ import './styles.css';
 import { state, assetById, uid } from './state';
 import { setLang, t, tf, SOURCES, LANGS, LANG_NAMES, type Lang } from './i18n';
 import { icons, brandMark } from './ui/icons';
-import { loadFiles, seek as seekVideo, thumbnail } from './engine/media';
+import { filmstrip, loadFiles, seek as seekVideo, thumbnail } from './engine/media';
 import { buildProject, relayout, appendAssets, buildCaptions, TEMPLATES } from './engine/autoedit';
 import { ReelRenderer, SIZES, totalDuration } from './engine/render';
 import { Player } from './engine/player';
@@ -145,6 +145,12 @@ function shell(): string {
       <div class="row row--between">
         <span class="empty-note" id="mediaCount"></span>
         <button class="btn btn--ghost btn--sm" id="clear">${icons.trash}<span data-i18n="media.clear"></span></button>
+      </div>
+      <div class="field prep__len">
+        <label for="lenChipsTop"><span data-i18n="duration.label"></span> <output id="targetValTop">12s</output></label>
+        <div class="chips" id="lenChipsTop" role="group">
+          ${LENGTH_PRESETS.map((n) => `<button type="button" data-len="${n}">${n}s</button>`).join('')}
+        </div>
       </div>
       <div class="prep__actions">
         <button class="btn btn--primary btn--hero" id="magic">${icons.spark}<span data-i18n="prep.magic"></span></button>
@@ -560,6 +566,7 @@ async function addFiles(files: File[]): Promise<void> {
   scheduleSave();
   await paintThumbs(added);
   applyMix();
+  void ensureStrips();
 }
 
 function renderStrip(): void {
@@ -810,6 +817,7 @@ async function restoreSession(): Promise<boolean> {
   syncFlowState();
   await paintThumbs(assets);
   applyMix();
+  void ensureStrips();
   return true;
 }
 
@@ -871,35 +879,57 @@ function renderPrep(): void {
       const entry = prepFor(asset);
       const isVideo = asset.kind === 'video';
       const span = isVideo ? entry.out - entry.in : 0;
-      return `<article class="prepcard${entry.include ? '' : ' is-out'}" data-asset="${asset.id}">
+      const total = asset.srcDuration || 1;
+      const left = isVideo ? (entry.in / total) * 100 : 0;
+      const right = isVideo ? 100 - (entry.out / total) * 100 : 0;
+      return `<article class="prepcard${entry.include ? '' : ' is-out'}" data-asset="${asset.id}" draggable="false">
+        <button class="prepcard__grip" data-prep="grip" aria-label="${t('prep.move')}">${icons.layers}</button>
         <img class="prepcard__thumb" data-id="${asset.id}" src="${asset.thumb ?? ''}" alt="" />
         <div class="prepcard__body">
-          <strong>${i + 1}. ${asset.name.replace(/\.[^.]+$/, '').slice(0, 26)}</strong>
-          <span class="empty-note">${
-            isVideo ? `${entry.in.toFixed(1)}s → ${entry.out.toFixed(1)}s · ${span.toFixed(1)}s` : t('prep.still')
-          }</span>
+          <div class="prepcard__line">
+            <strong>${i + 1}. ${asset.name.replace(/\.[^.]+$/, '').slice(0, 22)}</strong>
+            <span class="empty-note" data-prep-label>${
+              isVideo ? `${entry.in.toFixed(1)}–${entry.out.toFixed(1)}s · ${span.toFixed(1)}s` : t('prep.still')
+            }</span>
+          </div>
           ${
             isVideo
-              ? `<label class="prepcard__range"><span class="sr-only">${t('prep.in')}</span>
-                  <input type="range" data-prep="in" min="0" max="${asset.srcDuration.toFixed(1)}" step="0.1" value="${entry.in}" />
-                </label>
-                <label class="prepcard__range"><span class="sr-only">${t('prep.out')}</span>
-                  <input type="range" data-prep="out" min="0" max="${asset.srcDuration.toFixed(1)}" step="0.1" value="${entry.out}" />
-                </label>`
+              ? `<div class="trimbar" data-prep="bar" style="${asset.strip ? `background-image:url(${asset.strip})` : ''}">
+                  <span class="trimbar__shade" style="width:${left.toFixed(2)}%"></span>
+                  <span class="trimbar__shade trimbar__shade--end" style="width:${right.toFixed(2)}%"></span>
+                  <span class="trimbar__handle" data-trim="in" role="slider" tabindex="0"
+                    aria-label="${t('prep.in')}" aria-valuemin="0" aria-valuemax="${total.toFixed(1)}" aria-valuenow="${entry.in.toFixed(1)}"
+                    style="left:${left.toFixed(2)}%"></span>
+                  <span class="trimbar__handle" data-trim="out" role="slider" tabindex="0"
+                    aria-label="${t('prep.out')}" aria-valuemin="0" aria-valuemax="${total.toFixed(1)}" aria-valuenow="${entry.out.toFixed(1)}"
+                    style="left:${(100 - right).toFixed(2)}%"></span>
+                </div>`
               : ''
           }
         </div>
         <div class="prepcard__actions">
-          <button class="btn btn--icon btn--ghost" data-prep="up" aria-label="${t('clip.up')}" ${i === 0 ? 'disabled' : ''}>${icons.up}</button>
-          <button class="btn btn--icon btn--ghost" data-prep="down" aria-label="${t('clip.down')}" ${
-            i === state.assets.length - 1 ? 'disabled' : ''
-          }>${icons.down}</button>
+          ${isVideo ? `<button class="btn btn--icon btn--ghost" data-prep="play" aria-label="${t('prep.preview')}">${icons.play}</button>` : ''}
           <button class="btn btn--icon btn--ghost" data-prep="over" aria-label="${t('over.add')}">${icons.layers}</button>
           <button class="btn btn--icon btn--ghost" data-prep="toggle" aria-pressed="${!entry.include}" aria-label="${t('prep.toggle')}">${icons.close}</button>
         </div>
       </article>`;
     })
     .join('');
+}
+
+/** Builds the film strips of the imported videos, one at a time so the page stays responsive. */
+async function ensureStrips(): Promise<void> {
+  for (const asset of state.assets) {
+    if (asset.kind !== 'video' || asset.strip) continue;
+    try {
+      asset.strip = await filmstrip(asset);
+    } catch {
+      continue;
+    }
+    for (const bar of Array.from(document.querySelectorAll<HTMLElement>(`.prepcard[data-asset="${asset.id}"] .trimbar`))) {
+      bar.style.backgroundImage = `url(${asset.strip})`;
+    }
+  }
 }
 
 /** Re-shoots the thumbnail at the chosen in point, so the card shows where the shot starts. */
@@ -1405,25 +1435,12 @@ function renderScore(): void {
         <p>${t('score.sub')}</p>
       </div>
     </div>
-    <h3 class="panel__title" style="margin-top:16px">${t('score.factors')}</h3>
-    <ul class="factors">
-      ${score.factors
-        .map(
-          (f) => `<li>
-            <div class="factor__head"><span>${t(`factor.${f.id}`)}</span>
-              <span class="factor__val">${f.score.toFixed(1)} / ${f.max}</span></div>
-            <div class="bar"><span style="width:${Math.round((f.score / f.max) * 100)}%"></span></div>
-            <div class="factor__detail">${f.detail.map((d) => `<span>${d}</span>`).join('')}</div>
-          </li>`,
-        )
-        .join('')}
-    </ul>
     ${
       score.tips.length
-        ? `<h3 class="panel__title" style="margin-top:16px">${t('score.tips')}</h3>
+        ? `<h3 class="panel__title" style="margin-top:14px">${t('score.tips')}</h3>
     <ul class="tips">
       ${score.tips
-        .slice(0, 6)
+        .slice(0, 3)
         .map(
           (tip) => `<li class="tip ${tip.lost >= 4 ? 'tip--critical' : ''}">
             <div class="tip__body">
@@ -1442,7 +1459,47 @@ function renderScore(): void {
         .join('')}
     </ul>`
         : ''
-    }`;
+    }
+    <details class="disclosure" id="scoreDetail">
+      <summary>${icons.sliders}<span>${t('score.factors')}</span></summary>
+    <ul class="factors">
+      ${score.factors
+        .map(
+          (f) => `<li>
+            <div class="factor__head"><span>${t(`factor.${f.id}`)}</span>
+              <span class="factor__val">${f.score.toFixed(1)} / ${f.max}</span></div>
+            <div class="bar"><span style="width:${Math.round((f.score / f.max) * 100)}%"></span></div>
+            <div class="factor__detail">${f.detail.map((d) => `<span>${d}</span>`).join('')}</div>
+          </li>`,
+        )
+        .join('')}
+    </ul>
+    ${
+      score.tips.length > 3
+        ? `<h3 class="panel__title" style="margin-top:16px">${t('score.tipsMore')}</h3>
+    <ul class="tips">
+      ${score.tips
+        .slice(3, 8)
+        .map(
+          (tip) => `<li class="tip ${tip.lost >= 4 ? 'tip--critical' : ''}">
+            <div class="tip__body">
+              <span>${t(tip.id)}</span>
+              <span class="tip__meta">
+                <span>-${tip.lost.toFixed(1)} pts</span>
+                ${tip.sources
+                  .map((s) => sourceLabel(s))
+                  .filter(Boolean)
+                  .map((s) => `<a href="${s!.url}" target="_blank" rel="noopener noreferrer">${s!.label}</a>`)
+                  .join('')}
+              </span>
+            </div>
+          </li>`,
+        )
+        .join('')}
+    </ul>`
+        : ''
+    }
+    </details>`;
   updateBadges();
 }
 
@@ -1797,14 +1854,13 @@ for (const sel of [fontSel, styleSel]) {
 }
 
 targetRange.addEventListener('input', () => {
-  $('targetVal').textContent = `${targetRange.value}s`;
   markPreset();
   if (state.audio) renderAudio();
 });
 targetRange.addEventListener('change', () => rebuild());
 templateSel.addEventListener('change', () => {
   targetRange.value = String(TEMPLATES[templateSel.value as TemplateId].target);
-  $('targetVal').textContent = `${targetRange.value}s`;
+  markPreset();
   rebuild();
 });
 
@@ -1912,24 +1968,30 @@ $('audioPreview').addEventListener('click', () => {
   updateTransport();
 });
 
-$('lenChips').addEventListener('click', (e) => {
+/** The reel length is offered both with the material and inside the settings. */
+function onLengthClick(e: Event): void {
   const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-len]');
   if (!btn) return;
   if (btn.dataset.len === 'manual') {
+    ($('settingsGroup') as HTMLDetailsElement).open = true;
     targetRange.focus();
     return;
   }
   targetRange.value = btn.dataset.len!;
-  $('targetVal').textContent = `${targetRange.value}s`;
   markPreset();
   renderAudio();
   rebuild();
-});
+}
+
+$('lenChips').addEventListener('click', onLengthClick);
+$('lenChipsTop').addEventListener('click', onLengthClick);
 
 function markPreset(): void {
   for (const btn of Array.from(document.querySelectorAll<HTMLElement>('[data-len]'))) {
     btn.setAttribute('aria-pressed', String(btn.dataset.len === targetRange.value));
   }
+  $('targetVal').textContent = `${targetRange.value}s`;
+  $('targetValTop').textContent = `${targetRange.value}s`;
 }
 
 $<HTMLSelectElement>('lang').addEventListener('change', (e) => {
@@ -2611,7 +2673,6 @@ async function autoEdit(): Promise<void> {
     fontSel.value = result.decision.pack.fontId;
     styleSel.value = result.decision.pack.styleId;
     targetRange.value = String(result.decision.target);
-    $('targetVal').textContent = `${result.decision.target}s`;
     markPreset();
     markPacks();
     applyAspect(state.project.aspect);
@@ -2856,24 +2917,157 @@ $('hub').addEventListener('click', (e) => {
   if (btn) void setSection(btn.dataset.section as Section);
 });
 
-$('prepList').addEventListener('input', (e) => {
-  const input = e.target as HTMLInputElement;
-  const card = input.closest<HTMLElement>('.prepcard');
-  const asset = card && state.assets.find((a) => a.id === card.dataset.asset);
-  if (!asset || !input.dataset.prep) return;
+/* ---------- trimming, previewing and moving a source clip ---------- */
+
+interface PrepDrag {
+  assetId: string;
+  kind: 'in' | 'out' | 'card';
+  startX: number;
+  startY: number;
+  from: PrepEntry;
+  moved: boolean;
+}
+
+let prepDrag: PrepDrag | null = null;
+
+function prepCardOf(target: HTMLElement): HTMLElement | null {
+  return target.closest<HTMLElement>('.prepcard');
+}
+
+function updatePrepCard(asset: MediaAsset): void {
+  const card = document.querySelector<HTMLElement>(`.prepcard[data-asset="${asset.id}"]`);
+  if (!card) return;
   const entry = prepFor(asset);
-  const value = Number(input.value);
-  if (input.dataset.prep === 'in') {
-    entry.in = Math.min(value, entry.out - 0.4);
-    refreshPrepThumb(asset, entry.in);
-  } else if (input.dataset.prep === 'out') {
-    entry.out = Math.max(value, entry.in + 0.4);
+  const total = asset.srcDuration || 1;
+  const left = (entry.in / total) * 100;
+  const right = 100 - (entry.out / total) * 100;
+  const label = card.querySelector('[data-prep-label]');
+  if (label) label.textContent = `${entry.in.toFixed(1)}–${entry.out.toFixed(1)}s · ${(entry.out - entry.in).toFixed(1)}s`;
+  const shades = card.querySelectorAll<HTMLElement>('.trimbar__shade');
+  if (shades[0]) shades[0].style.width = `${left.toFixed(2)}%`;
+  if (shades[1]) shades[1].style.width = `${right.toFixed(2)}%`;
+  const handles = card.querySelectorAll<HTMLElement>('.trimbar__handle');
+  if (handles[0]) {
+    handles[0].style.left = `${left.toFixed(2)}%`;
+    handles[0].setAttribute('aria-valuenow', entry.in.toFixed(1));
   }
+  if (handles[1]) {
+    handles[1].style.left = `${(100 - right).toFixed(2)}%`;
+    handles[1].setAttribute('aria-valuenow', entry.out.toFixed(1));
+  }
+}
+
+$('prepList').addEventListener('pointerdown', (e) => {
+  const target = e.target as HTMLElement;
+  const card = prepCardOf(target);
+  const asset = card && state.assets.find((a) => a.id === card.dataset.asset);
+  if (!card || !asset) return;
+  if (target.closest('button') && !target.closest('[data-prep="grip"]')) return;
+
+  const handle = target.closest<HTMLElement>('.trimbar__handle');
+  const grip = target.closest<HTMLElement>('[data-prep="grip"]');
+  if (!handle && !grip) return;
+
+  const entry = prepFor(asset);
+  prepDrag = {
+    assetId: asset.id,
+    kind: handle ? (handle.dataset.trim as 'in' | 'out') : 'card',
+    startX: e.clientX,
+    startY: e.clientY,
+    from: { ...entry },
+    moved: false,
+  };
+  card.classList.add('is-dragging');
+  e.preventDefault();
+});
+
+window.addEventListener('pointermove', (e) => {
+  const drag = prepDrag;
+  if (!drag) return;
+  const asset = state.assets.find((a) => a.id === drag.assetId);
+  if (!asset) return;
+  if (Math.abs(e.clientX - drag.startX) > 3 || Math.abs(e.clientY - drag.startY) > 3) drag.moved = true;
+
+  if (drag.kind === 'card') {
+    // reorder by walking over the cards the pointer is on top of
+    const cards = Array.from(document.querySelectorAll<HTMLElement>('.prepcard'));
+    const over = cards.findIndex((c) => {
+      const r = c.getBoundingClientRect();
+      return e.clientY >= r.top && e.clientY <= r.bottom;
+    });
+    const index = state.assets.findIndex((a) => a.id === drag.assetId);
+    if (over >= 0 && over !== index) {
+      state.assets = reorder(state.assets, index, over);
+      renderPrep();
+      document.querySelector(`.prepcard[data-asset="${drag.assetId}"]`)?.classList.add('is-dragging');
+    }
+    return;
+  }
+
+  const bar = document.querySelector<HTMLElement>(`.prepcard[data-asset="${asset.id}"] .trimbar`);
+  if (!bar) return;
+  const rect = bar.getBoundingClientRect();
+  const seconds = ((e.clientX - rect.left) / rect.width) * (asset.srcDuration || 1);
+  const entry = prepFor(asset);
+  if (drag.kind === 'in') entry.in = Math.max(0, Math.min(seconds, entry.out - 0.4));
+  else entry.out = Math.min(asset.srcDuration, Math.max(seconds, entry.in + 0.4));
+  updatePrepCard(asset);
+});
+
+window.addEventListener('pointerup', () => {
+  const drag = prepDrag;
+  prepDrag = null;
+  for (const el of Array.from(document.querySelectorAll('.prepcard.is-dragging'))) el.classList.remove('is-dragging');
+  if (!drag) return;
+  const asset = state.assets.find((a) => a.id === drag.assetId);
+  if (!asset) return;
   segmentCache.delete(asset.id);
-  const label = card.querySelector('.empty-note');
-  if (label) label.textContent = `${entry.in.toFixed(1)}s → ${entry.out.toFixed(1)}s · ${(entry.out - entry.in).toFixed(1)}s`;
+  if (drag.kind === 'in' && drag.moved) refreshPrepThumb(asset, prepFor(asset).in);
+  if (drag.kind === 'card') renderPrep();
   scheduleSave();
 });
+
+/** Arrow keys move a trim handle: a drag is not the only way to be precise. */
+$('prepList').addEventListener('keydown', (e) => {
+  const handle = (e.target as HTMLElement).closest<HTMLElement>('.trimbar__handle');
+  const card = handle && prepCardOf(handle);
+  const asset = card && state.assets.find((a) => a.id === card.dataset.asset);
+  if (!handle || !asset) return;
+  const step = e.key === 'ArrowLeft' ? -0.2 : e.key === 'ArrowRight' ? 0.2 : 0;
+  if (!step) return;
+  e.preventDefault();
+  const entry = prepFor(asset);
+  if (handle.dataset.trim === 'in') entry.in = Math.max(0, Math.min(entry.in + step, entry.out - 0.4));
+  else entry.out = Math.min(asset.srcDuration, Math.max(entry.out + step, entry.in + 0.4));
+  segmentCache.delete(asset.id);
+  updatePrepCard(asset);
+  scheduleSave();
+});
+
+/** Plays the chosen fragment of one source clip, on its own, before it is part of anything. */
+function previewSource(asset: MediaAsset, card: HTMLElement): void {
+  const existing = card.querySelector('video');
+  if (existing) {
+    existing.remove();
+    return;
+  }
+  player.pause();
+  const entry = prepFor(asset);
+  const video = document.createElement('video');
+  video.className = 'prepcard__preview';
+  video.src = asset.url;
+  video.currentTime = entry.in;
+  video.playsInline = true;
+  video.controls = true;
+  card.appendChild(video);
+  video.addEventListener('timeupdate', () => {
+    if (video.currentTime >= entry.out) {
+      video.pause();
+      video.currentTime = entry.in;
+    }
+  });
+  void video.play().catch(() => undefined);
+}
 
 $('prepList').addEventListener('click', (e) => {
   const button = (e.target as HTMLElement).closest<HTMLElement>('[data-prep]');
@@ -2887,6 +3081,11 @@ $('prepList').addEventListener('click', (e) => {
     addOverlay(asset);
     return;
   }
+  if (button.dataset.prep === 'play') {
+    previewSource(asset, card);
+    return;
+  }
+  if (button.dataset.prep === 'grip') return;
   if (button.dataset.prep === 'toggle') {
     const entry = prepFor(asset);
     entry.include = !entry.include;

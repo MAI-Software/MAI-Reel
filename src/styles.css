@@ -1890,6 +1890,7 @@ body[data-view='menu'] .layout {
 .prepcard {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 6px;
   border: 1px solid var(--border);
@@ -1925,9 +1926,94 @@ body[data-view='menu'] .layout {
   white-space: nowrap;
 }
 
-.prepcard__range input[type='range'] {
+/* the trim bar: the footage itself, with a handle at each end */
+.trimbar {
+  position: relative;
+  height: 40px;
+  border-radius: 6px;
+  background: var(--bg-deep) center / cover no-repeat;
+  border: 1px solid var(--border);
+  touch-action: none;
+  overflow: hidden;
+}
+
+.trimbar__shade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(4, 7, 15, 0.68);
+  pointer-events: none;
+}
+
+.trimbar__shade--end {
+  left: auto;
+  right: 0;
+}
+
+.trimbar__handle {
+  position: absolute;
+  top: 0;
+  width: 10px;
+  height: 100%;
+  margin-left: -5px;
+  border-radius: 4px;
+  background: linear-gradient(var(--primary), var(--primary-2));
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.trimbar__handle::after {
+  content: '';
+  position: absolute;
+  inset: -8px -10px;
+}
+
+.trimbar__handle:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.prepcard__grip {
+  flex: 0 0 auto;
+  width: 22px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-faint);
+  cursor: grab;
+  touch-action: none;
+}
+
+.prepcard__grip svg {
+  width: 16px;
+  height: 16px;
+}
+
+.prepcard.is-dragging {
+  border-color: var(--primary);
+  opacity: 0.9;
+}
+
+.prepcard__line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.prepcard__preview {
   width: 100%;
-  height: 18px;
+  max-height: 220px;
+  margin-top: 6px;
+  border-radius: 8px;
+  background: #000;
+}
+
+.prep__len {
+  gap: 4px;
 }
 
 .prepcard__actions {

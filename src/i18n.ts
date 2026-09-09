@@ -30,6 +30,9 @@ export const SOURCES: Source[] = [
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  'prep.move': 'Mover',
+  'prep.preview': 'Ver este clip',
+  'score.tipsMore': 'Más consejos',
   'res.label': 'Resolución',
   'res.full': 'recomendada',
   'frame.zoom': 'Zoom del plano',
@@ -381,6 +384,9 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  'prep.move': 'Move',
+  'prep.preview': 'Preview this clip',
+  'score.tipsMore': 'More tips',
   'res.label': 'Resolution',
   'res.full': 'recommended',
   'frame.zoom': 'Shot zoom',
@@ -732,6 +738,9 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'prep.move': 'Déplacer',
+  'prep.preview': 'Voir ce clip',
+  'score.tipsMore': 'Autres conseils',
   'res.label': 'Résolution',
   'res.full': 'recommandée',
   'frame.zoom': 'Zoom du plan',
@@ -1083,6 +1092,9 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  'prep.move': 'Verschieben',
+  'prep.preview': 'Diesen Clip ansehen',
+  'score.tipsMore': 'Weitere Tipps',
   'res.label': 'Auflösung',
   'res.full': 'empfohlen',
   'frame.zoom': 'Zoom der Einstellung',
@@ -1434,6 +1446,9 @@ const de: Dict = {
 };
 
 const it: Dict = {
+  'prep.move': 'Sposta',
+  'prep.preview': 'Vedi questa clip',
+  'score.tipsMore': 'Altri consigli',
   'res.label': 'Risoluzione',
   'res.full': 'consigliata',
   'frame.zoom': 'Zoom dell’inquadratura',
