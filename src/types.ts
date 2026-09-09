@@ -41,6 +41,34 @@ export interface Clip {
   spoken?: boolean;
   /** Where the subject sits in the source frame (0..1), used to reframe the crop. */
   focus?: { x: number; y: number };
+  /** Framing set by hand on the preview: zoom, and offset in fractions of the frame. */
+  frame?: Frame;
+}
+
+/** A hand-made adjustment of how a source sits inside the reel. */
+export interface Frame {
+  zoom: number;
+  x: number;
+  y: number;
+}
+
+/**
+ * A second video (or photo) on top of the shot: picture in picture, a split screen, a reaction.
+ * Overlays are silent, so they can be moved around without fighting the main audio.
+ */
+export interface Overlay {
+  id: string;
+  assetId: string;
+  start: number;
+  duration: number;
+  srcIn: number;
+  /** Centre of the box, in fractions of the frame. */
+  x: number;
+  y: number;
+  /** Width of the box as a fraction of the frame; the height follows the source ratio. */
+  scale: number;
+  /** Corner radius as a fraction of the box width. */
+  radius?: number;
 }
 
 /** One spoken word with the time it is said, used for word-by-word captions. */
@@ -107,4 +135,8 @@ export interface Project {
   musicVolume?: number;
   /** Drives the safe area: TikTok, Reels and Shorts each cover different edges. */
   platform?: Platform;
+  /** Height of the exported file in pixels: 1080 is the usual reel, 720 and 540 are lighter. */
+  resolution?: number;
+  /** Videos or photos layered on top of the shots. */
+  overlays?: Overlay[];
 }

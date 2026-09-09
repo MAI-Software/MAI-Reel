@@ -14,6 +14,7 @@ import { EFFECTS, TRANSITIONS, GRADES } from './data/effects';
 import { profileAssets, type ShotProfile } from './analysis/shot';
 import { planSegments, type SourceSegment } from './engine/segment';
 import { Timeline } from './ui/timeline';
+import { Framing, MAX_ZOOM, MIN_ZOOM } from './ui/framing';
 import { reorder } from './engine/trim';
 import { setMusicVolume, setVideoVolume } from './engine/mixer';
 import { clearSession, isStorageAvailable, putFile, pruneFiles, readFiles, readSession, saveSession } from './engine/store';
@@ -38,7 +39,7 @@ import {
 import { STYLE_PACKS, packById, autoDirect, formatReason, type Reason } from './engine/director';
 import { buildEntertainProject, idleEnhance } from './engine/autoedit';
 import { detectFocus } from './analysis/focus';
-import type { Aspect, Effect, Enhance, Grade, MediaAsset, ReelMode, TemplateId, TextAnim, TextOverlay, Transition, Project } from './types';
+import type { Aspect, Effect, Enhance, Grade, MediaAsset, Overlay, ReelMode, TemplateId, TextAnim, TextOverlay, Transition, Project } from './types';
 
 const PARENT_SITE = 'https://mai-softwares.com';
 const REPO = 'https://github.com/MAI-Software/MAI-Reel';
@@ -317,6 +318,14 @@ function shell(): string {
               <option value="9:16">9:16 · Reels</option>
               <option value="4:5">4:5 · feed</option>
               <option value="1:1">1:1 · square</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="resolution" data-i18n="res.label"></label>
+            <select id="resolution">
+              <option value="1080">1080 · <span data-i18n="res.full"></span></option>
+              <option value="720">720</option>
+              <option value="540">540</option>
             </select>
           </div>
           <div class="field">
@@ -885,6 +894,7 @@ function renderPrep(): void {
           <button class="btn btn--icon btn--ghost" data-prep="down" aria-label="${t('clip.down')}" ${
             i === state.assets.length - 1 ? 'disabled' : ''
           }>${icons.down}</button>
+          <button class="btn btn--icon btn--ghost" data-prep="over" aria-label="${t('over.add')}">${icons.layers}</button>
           <button class="btn btn--icon btn--ghost" data-prep="toggle" aria-pressed="${!entry.include}" aria-label="${t('prep.toggle')}">${icons.close}</button>
         </div>
       </article>`;
@@ -1152,14 +1162,50 @@ function renderBlocks(): void {
  */
 function renderInspector(): void {
   const box = $('inspector');
+  const overlay = selectedOverlay();
+  if (overlay) {
+    const asset = assetById(overlay.assetId);
+    box.hidden = false;
+    box.innerHTML = `<article class="block" data-overlay="${overlay.id}">
+      <div class="block__head">
+        <span class="block__index">${icons.layers}</span>
+        <strong>${asset?.name.replace(/\.[^.]+$/, '').slice(0, 20) ?? ''}</strong>
+        <span class="block__spacer"></span>
+        <button class="btn btn--icon btn--ghost btn--danger" data-overlay-remove aria-label="${t('clip.delete')}">${icons.trash}</button>
+      </div>
+      <label class="block__range">${t('over.size')} <output>${Math.round(overlay.scale * 100)}%</output>
+        <input type="range" id="frameZoom" data-overlay-field="scale" min="12" max="160" step="2" value="${Math.round(overlay.scale * 100)}" />
+      </label>
+      <label class="block__range">${t('over.start')} <output>${overlay.start.toFixed(1)}s</output>
+        <input type="range" data-overlay-field="start" min="0" max="${Math.max(0.1, totalDuration(state.project)).toFixed(1)}" step="0.1" value="${overlay.start}" />
+      </label>
+      <label class="block__range">${t('clip.duration')} <output>${overlay.duration.toFixed(1)}s</output>
+        <input type="range" data-overlay-field="duration" min="0.4" max="${Math.max(1, totalDuration(state.project)).toFixed(1)}" step="0.1" value="${overlay.duration}" />
+      </label>
+      <span class="empty-note" data-i18n="over.hint">${t('over.hint')}</span>
+    </article>`;
+    return;
+  }
+
   const index = state.project.clips.findIndex((c) => c.id === timeline?.selected);
   if (index < 0) {
     box.hidden = true;
     box.innerHTML = '';
     return;
   }
+  const clip = state.project.clips[index]!;
+  const zoom = Math.round((clip.frame?.zoom ?? 1) * 100);
   box.hidden = false;
-  box.innerHTML = clipCard(index);
+  box.innerHTML = `${clipCard(index)}
+    <div class="framing" data-clip="${clip.id}">
+      <label class="block__range">${t('frame.zoom')} <output>${zoom}%</output>
+        <input type="range" id="frameZoom" data-frame="zoom" min="${Math.round(MIN_ZOOM * 100)}" max="${Math.round(
+          MAX_ZOOM * 100,
+        )}" step="2" value="${zoom}" />
+      </label>
+      <button class="btn btn--sm btn--ghost" data-frame="reset">${icons.target}<span data-i18n="frame.reset">${t('frame.reset')}</span></button>
+      <span class="empty-note">${t('frame.hint')}</span>
+    </div>`;
 }
 
 function onCardClick(e: Event): void {
@@ -1239,6 +1285,57 @@ function onCardClick(e: Event): void {
 
 blocksBox.addEventListener('click', onCardClick);
 $('inspector').addEventListener('click', onCardClick);
+
+$('inspector').addEventListener('click', (e) => {
+  const target = e.target as HTMLElement;
+  if (target.closest('[data-overlay-remove]')) {
+    const id = framing.selectedOverlay;
+    state.project.overlays = (state.project.overlays ?? []).filter((o) => o.id !== id);
+    framing.selectedOverlay = null;
+    touch();
+    renderInspector();
+    player.drawNow();
+    return;
+  }
+  if (target.closest('[data-frame="reset"]')) {
+    const clip = state.project.clips.find((c) => c.id === timeline?.selected);
+    if (!clip) return;
+    delete clip.frame;
+    touch();
+    renderInspector();
+    player.drawNow();
+  }
+});
+
+$('inspector').addEventListener('input', (e) => {
+  const input = e.target as HTMLInputElement;
+  const out = input.parentElement?.querySelector('output');
+
+  if (input.dataset.frame === 'zoom') {
+    const clip = state.project.clips.find((c) => c.id === timeline?.selected);
+    if (!clip) return;
+    framing.zoomClip(clip, Number(input.value) / 100);
+    if (out) out.textContent = `${input.value}%`;
+    return;
+  }
+
+  const field = input.dataset.overlayField;
+  const overlay = selectedOverlay();
+  if (!field || !overlay) return;
+  const value = Number(input.value);
+  if (field === 'scale') {
+    overlay.scale = value / 100;
+    if (out) out.textContent = `${input.value}%`;
+  } else if (field === 'start') {
+    overlay.start = value;
+    if (out) out.textContent = `${value.toFixed(1)}s`;
+  } else if (field === 'duration') {
+    overlay.duration = Math.max(0.4, value);
+    if (out) out.textContent = `${value.toFixed(1)}s`;
+  }
+  touch();
+  player.seek(state.time);
+});
 
 function onCardInput(e: Event): void {
   const input = e.target as HTMLInputElement | HTMLSelectElement;
@@ -1427,7 +1524,8 @@ async function exportVideo(): Promise<void> {
     player.pause();
     player.seek(0);
     await ensureFontsLoaded();
-    renderer.setScale(1);
+    // the export renders at the chosen resolution, not at whatever the preview was using
+    renderer.setScale((state.project.resolution ?? 1080) / SIZES[state.project.aspect][0]);
     applyAspect(state.project.aspect);
     player.seek(0);
 
@@ -1485,6 +1583,70 @@ async function exportVideo(): Promise<void> {
   }
 }
 
+
+/* ---------- framing straight on the preview ---------- */
+
+const framing = new Framing($('viewport'), {
+  getProject: () => state.project,
+  resolve: assetById,
+  getTime: () => state.time,
+  selectedClip: () => timeline?.selected ?? null,
+  isPlaying: () => player.playing,
+  onChange: () => {
+    player.drawNow();
+    scoreStale = true;
+    scheduleSave();
+    renderFrameControls();
+  },
+  onSelectOverlay: () => renderInspector(),
+});
+
+/** Adds a source on top of the reel, starting where the playhead is. */
+function addOverlay(asset: MediaAsset): void {
+  const total = totalDuration(state.project);
+  if (total < 0.3) {
+    toast(t('over.needReel'));
+    return;
+  }
+  const start = Math.min(state.time, Math.max(0, total - 1));
+  const room = total - start;
+  const length = asset.kind === 'video' ? Math.min(asset.srcDuration || 3, room, 6) : Math.min(3, room);
+  state.project.overlays = [
+    ...(state.project.overlays ?? []),
+    {
+      id: uid('o'),
+      assetId: asset.id,
+      start,
+      duration: Math.max(0.6, length),
+      srcIn: 0,
+      x: 0.72,
+      y: 0.26,
+      scale: 0.34,
+      radius: 0.06,
+    },
+  ];
+  framing.selectedOverlay = state.project.overlays[state.project.overlays.length - 1]!.id;
+  touch();
+  renderInspector();
+  player.seek(start + 0.05);
+  toast(t('over.added'));
+}
+
+function selectedOverlay(): Overlay | undefined {
+  return (state.project.overlays ?? []).find((o) => o.id === framing.selectedOverlay);
+}
+
+/** Keeps the zoom readout in step with a gesture on the preview. */
+function renderFrameControls(): void {
+  const zoom = $<HTMLInputElement>('frameZoom');
+  if (!zoom) return;
+  const overlay = selectedOverlay();
+  const clip = state.project.clips.find((c) => c.id === timeline?.selected);
+  const value = overlay ? overlay.scale : clip?.frame?.zoom ?? 1;
+  zoom.value = String(Math.round(value * 100));
+  const out = zoom.parentElement?.querySelector('output');
+  if (out) out.textContent = `${Math.round(value * 100)}%`;
+}
 
 /* ---------- the timeline ---------- */
 
@@ -1671,6 +1833,12 @@ $('captions').addEventListener('click', () => {
   touch();
   renderBlocks();
   toast(`${captions.length} ${t('toast.captions')}`);
+});
+
+$('resolution').addEventListener('change', (e) => {
+  state.project.resolution = Number((e.target as HTMLSelectElement).value);
+  localStorage.setItem('mai-reel-resolution', String(state.project.resolution));
+  touch();
 });
 
 $('platform').addEventListener('change', (e) => {
@@ -2715,6 +2883,10 @@ $('prepList').addEventListener('click', (e) => {
   const asset = state.assets[index];
   if (!asset) return;
 
+  if (button.dataset.prep === 'over') {
+    addOverlay(asset);
+    return;
+  }
   if (button.dataset.prep === 'toggle') {
     const entry = prepFor(asset);
     entry.include = !entry.include;
@@ -2867,6 +3039,11 @@ document.body.dataset.view = openTool ? 'tool' : 'menu';
 void setSection(firstSection, false);
 syncFlowState();
 applyMix();
+const storedResolution = localStorage.getItem('mai-reel-resolution');
+if (storedResolution) {
+  state.project.resolution = Number(storedResolution);
+  $<HTMLSelectElement>('resolution').value = storedResolution;
+}
 const storedPlatform = localStorage.getItem('mai-reel-platform');
 if (storedPlatform) {
   state.project.platform = storedPlatform as Project['platform'];

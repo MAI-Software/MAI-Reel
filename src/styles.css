@@ -1856,6 +1856,27 @@ body[data-view='menu'] .layout {
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 }
 
+.framing {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+/* the preview is a working surface now, not just a picture */
+.viewport {
+  touch-action: none;
+  cursor: grab;
+}
+
+.viewport:active {
+  cursor: grabbing;
+}
+
 /* ---------- preparation: the material before it becomes an edit ---------- */
 
 .prep {

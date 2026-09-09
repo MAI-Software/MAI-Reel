@@ -1,4 +1,4 @@
-import type { Aspect, Enhance, MediaAsset, Platform, Project, TextOverlay } from '../types';
+import type { Aspect, Enhance, Frame, MediaAsset, Overlay, Platform, Project, TextOverlay } from '../types';
 import { fontCss, styleById } from '../data/typography';
 import { effectById, gradeById, transitionById, type Ease, type MotionSpec } from '../data/effects';
 
@@ -36,6 +36,18 @@ export function safeAreaFor(platform: Platform | undefined): SafeArea {
 export const SAFE = SAFE_AREAS.generic;
 
 const clampRange = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+
+/** Pixel box of a layered source inside a canvas of dw x dh. */
+export function overlayBox(
+  overlay: { x: number; y: number; scale: number },
+  dw: number,
+  dh: number,
+  ratio: number,
+): { x: number; y: number; w: number; h: number } {
+  const w = Math.max(0, overlay.scale) * dw;
+  const h = ratio > 0 ? w / ratio : w;
+  return { x: overlay.x * dw - w / 2, y: overlay.y * dh - h / 2, w, h };
+}
 export const TRANSITION_DUR = 0.32;
 
 export type Resolve = (id: string) => MediaAsset | undefined;
@@ -254,6 +266,7 @@ export class ReelRenderer {
     gradeId = 'none',
     extra?: Motion,
     focus?: { x: number; y: number },
+    frame?: Frame,
   ): void {
     const { ctx } = this;
     const dw = this.canvas.width;
@@ -274,15 +287,21 @@ export class ReelRenderer {
       : eff;
 
     const grade = gradeById(gradeId);
-    const scale = Math.max(dw / sw, dh / sh) * m.zoom;
+    const hand = frame ?? { zoom: 1, x: 0, y: 0 };
+    const scale = Math.max(dw / sw, dh / sh) * m.zoom * hand.zoom;
     const w = sw * scale;
     const h = sh * scale;
     // a horizontal video cropped to 9:16 loses most of its width, so the crop starts on the
     // subject instead of on the middle of the frame; the effect's pan still moves from there
     const baseX = focus ? clampRange(dw / 2 - focus.x * w, dw - w, 0) : (dw - w) / 2;
     const baseY = focus ? clampRange(dh / 2 - focus.y * h, dh - h, 0) : (dh - h) / 2;
-    const x = clampRange(baseX + m.panX * ((w - dw) / 2), Math.min(0, dw - w), Math.max(0, dw - w));
-    const y = clampRange(baseY + m.panY * ((h - dh) / 2), Math.min(0, dh - h), Math.max(0, dh - h));
+    // a hand-set frame is a deliberate choice, so it is not pushed back inside the cover bounds
+    const x = frame
+      ? baseX + m.panX * ((w - dw) / 2) + hand.x * dw
+      : clampRange(baseX + m.panX * ((w - dw) / 2), Math.min(0, dw - w), Math.max(0, dw - w));
+    const y = frame
+      ? baseY + m.panY * ((h - dh) / 2) + hand.y * dh
+      : clampRange(baseY + m.panY * ((h - dh) / 2), Math.min(0, dh - h), Math.max(0, dh - h));
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -493,6 +512,36 @@ export class ReelRenderer {
     ctx.textAlign = 'center';
   }
 
+  /** Draws one layered source inside its box, cropped to fill and with rounded corners. */
+  private drawOverlay(overlay: Overlay, asset: MediaAsset): void {
+    const { ctx } = this;
+    const dw = this.canvas.width;
+    const dh = this.canvas.height;
+    const box = overlayBox(overlay, dw, dh, asset.width / (asset.height || 1));
+    if (box.w < 4 || box.h < 4) return;
+
+    const sw = asset.width;
+    const sh = asset.height;
+    const scale = Math.max(box.w / sw, box.h / sh);
+    const w = sw * scale;
+    const h = sh * scale;
+
+    ctx.save();
+    const radius = Math.min(box.w, box.h) * (overlay.radius ?? 0.06);
+    roundRect(ctx, box.x, box.y, box.w, box.h, radius);
+    ctx.clip();
+    ctx.drawImage(asset.el as CanvasImageSource, box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h);
+    ctx.restore();
+
+    // a hairline keeps the layer readable over a busy shot
+    ctx.save();
+    roundRect(ctx, box.x, box.y, box.w, box.h, radius);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 2 * this.unit;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   private drawSafeZones(): void {
     const { ctx } = this;
     const dw = this.canvas.width;
@@ -549,9 +598,16 @@ export class ReelRenderer {
       if (asset) {
         ctx.save();
         const alpha = this.applyIncoming(def, tp, raw);
-        this.drawMedia(asset, clip.effect, p, t, alpha, clip.grade ?? 'none', extra, clip.focus);
+        this.drawMedia(asset, clip.effect, p, t, alpha, clip.grade ?? 'none', extra, clip.focus, clip.frame);
         ctx.restore();
         if (raw < 1) this.drawOverlayPhase(def, tp, raw);
+      }
+    }
+
+    for (const overlay of project.overlays ?? []) {
+      if (t >= overlay.start && t < overlay.start + overlay.duration) {
+        const asset = resolve(overlay.assetId);
+        if (asset) this.drawOverlay(overlay, asset);
       }
     }
 

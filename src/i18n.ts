@@ -30,6 +30,17 @@ export const SOURCES: Source[] = [
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  'res.label': 'Resolución',
+  'res.full': 'recomendada',
+  'frame.zoom': 'Zoom del plano',
+  'frame.reset': 'Centrar de nuevo',
+  'frame.hint': 'Arrastra sobre la previsualización para mover el plano y usa la rueda o dos dedos para el zoom.',
+  'over.add': 'Superponer',
+  'over.added': 'Superpuesto: arrástralo en la previsualización',
+  'over.size': 'Tamaño',
+  'over.start': 'Empieza en',
+  'over.hint': 'Arrástralo en la previsualización para colocarlo. Se ve sin sonido.',
+  'over.needReel': 'Monta el reel antes de superponer nada.',
   'prep.title': 'Preparar el material',
   'prep.hint': 'Ordena, quita lo que no quieras y recorta cada clip. O pulsa Hacer magia y se decide todo solo.',
   'prep.magic': 'Hacer magia',
@@ -370,6 +381,17 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  'res.label': 'Resolution',
+  'res.full': 'recommended',
+  'frame.zoom': 'Shot zoom',
+  'frame.reset': 'Recentre',
+  'frame.hint': 'Drag on the preview to move the shot, and use the wheel or two fingers to zoom.',
+  'over.add': 'Overlay',
+  'over.added': 'Layered: drag it on the preview',
+  'over.size': 'Size',
+  'over.start': 'Starts at',
+  'over.hint': 'Drag it on the preview to place it. It plays silently.',
+  'over.needReel': 'Build the reel before layering anything on it.',
   'prep.title': 'Prepare the material',
   'prep.hint': 'Reorder, drop what you do not want and trim each clip. Or press Magic and let it decide.',
   'prep.magic': 'Magic',
@@ -710,6 +732,17 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'res.label': 'Résolution',
+  'res.full': 'recommandée',
+  'frame.zoom': 'Zoom du plan',
+  'frame.reset': 'Recentrer',
+  'frame.hint': 'Faites glisser sur l’aperçu pour déplacer le plan, et zoomez à la molette ou à deux doigts.',
+  'over.add': 'Superposer',
+  'over.added': 'Superposé : faites-le glisser sur l’aperçu',
+  'over.size': 'Taille',
+  'over.start': 'Début',
+  'over.hint': 'Faites-le glisser sur l’aperçu pour le placer. Il est muet.',
+  'over.needReel': 'Montez le reel avant d’y superposer quelque chose.',
   'prep.title': 'Préparer le matériel',
   'prep.hint': 'Réorganisez, retirez ce que vous ne voulez pas et rognez chaque clip. Ou appuyez sur Magie et tout se décide seul.',
   'prep.magic': 'Magie',
@@ -1050,6 +1083,17 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  'res.label': 'Auflösung',
+  'res.full': 'empfohlen',
+  'frame.zoom': 'Zoom der Einstellung',
+  'frame.reset': 'Neu zentrieren',
+  'frame.hint': 'Zieh auf der Vorschau, um die Einstellung zu bewegen, und zoome mit dem Rad oder zwei Fingern.',
+  'over.add': 'Überlagern',
+  'over.added': 'Überlagert: zieh es auf der Vorschau',
+  'over.size': 'Größe',
+  'over.start': 'Beginnt bei',
+  'over.hint': 'Zieh es auf der Vorschau an seinen Platz. Es läuft stumm.',
+  'over.needReel': 'Bau erst den Reel, bevor du etwas darüberlegst.',
   'prep.title': 'Material vorbereiten',
   'prep.hint': 'Sortieren, Aussortieren und jeden Clip kürzen. Oder Magie drücken und alles entscheiden lassen.',
   'prep.magic': 'Magie',
@@ -1390,6 +1434,17 @@ const de: Dict = {
 };
 
 const it: Dict = {
+  'res.label': 'Risoluzione',
+  'res.full': 'consigliata',
+  'frame.zoom': 'Zoom dell’inquadratura',
+  'frame.reset': 'Ricentrare',
+  'frame.hint': 'Trascina sull’anteprima per spostare l’inquadratura e usa la rotella o due dita per lo zoom.',
+  'over.add': 'Sovrapporre',
+  'over.added': 'Sovrapposto: trascinalo sull’anteprima',
+  'over.size': 'Dimensione',
+  'over.start': 'Inizia a',
+  'over.hint': 'Trascinalo sull’anteprima per posizionarlo. Va senza audio.',
+  'over.needReel': 'Monta il reel prima di sovrapporre qualcosa.',
   'prep.title': 'Preparare il materiale',
   'prep.hint': 'Riordina, togli quello che non vuoi e taglia ogni clip. Oppure premi Magia e decide tutto da solo.',
   'prep.magic': 'Magia',

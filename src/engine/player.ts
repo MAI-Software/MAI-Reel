@@ -146,5 +146,28 @@ export class Player {
       if (this.playing && v.paused) void v.play().catch(() => undefined);
       if (!this.playing && !v.paused) v.pause();
     }
+
+    this.syncOverlays(project, hard);
+  }
+
+  /** Layered videos follow the timeline too, silently: their audio would fight the main mix. */
+  private syncOverlays(project: Project, hard: boolean): void {
+    for (const overlay of project.overlays ?? []) {
+      const asset = this.hooks.resolve(overlay.assetId);
+      if (!asset || asset.kind !== 'video') continue;
+      const v = asset.el as HTMLVideoElement;
+      const active = this.time >= overlay.start && this.time < overlay.start + overlay.duration;
+      if (!active) {
+        if (!v.paused) v.pause();
+        continue;
+      }
+      v.muted = true;
+      const want = overlay.srcIn + (this.time - overlay.start);
+      if (hard || Math.abs(v.currentTime - want) > 0.3) {
+        v.currentTime = Math.max(0, Math.min(want, (v.duration || want) - 0.03));
+      }
+      if (this.playing && v.paused) void v.play().catch(() => undefined);
+      if (!this.playing && !v.paused) v.pause();
+    }
   }
 }

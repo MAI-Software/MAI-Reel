@@ -214,6 +214,11 @@ export async function fastExport(opts: FastExportOptions): Promise<Blob> {
       const asset = resolve(clip.assetId);
       if (asset?.kind === 'video') await seekTo(asset.el as HTMLVideoElement, clip.srcIn + (t - clip.start));
     }
+    for (const overlay of project.overlays ?? []) {
+      if (t < overlay.start || t >= overlay.start + overlay.duration) continue;
+      const asset = resolve(overlay.assetId);
+      if (asset?.kind === 'video') await seekTo(asset.el as HTMLVideoElement, overlay.srcIn + (t - overlay.start));
+    }
 
     renderer.draw(project, resolve, t);
     const frame = new VideoFrame(renderer.canvas, {
