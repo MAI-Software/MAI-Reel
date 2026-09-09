@@ -120,6 +120,7 @@ function shell(): string {
   </div>
 
   <main class="layout">
+    <div class="col col--work" id="colWork">
     <section class="panel panel--media" aria-label="media" id="panel-media">
       <h2 class="panel__title" id="mediaTitle"></h2>
       <div class="dropzone" id="drop">
@@ -221,52 +222,6 @@ function shell(): string {
       </details>
     </section>
 
-    <section class="stage" id="stage">
-      <div class="viewport" id="viewport">
-        <div class="viewport__empty" id="viewportEmpty">
-          <ol class="steps">
-            <li data-i18n="onboard.1"></li>
-            <li data-i18n="onboard.2"></li>
-            <li data-i18n="onboard.3"></li>
-          </ol>
-        </div>
-      </div>
-      <div class="transport">
-        <button class="btn btn--icon" id="play" aria-label="play">${icons.play}</button>
-        <div class="scrubwrap">
-          <input type="range" id="scrub" min="0" max="1" step="0.02" value="0" aria-label="timeline" />
-          <div class="ticks" id="ticks" aria-hidden="true"></div>
-        </div>
-        <span class="time" id="time">0.0 / 0.0s</span>
-      </div>
-      <div class="tl" id="timeline" hidden></div>
-      <div class="inspector" id="inspector" hidden></div>
-      <div class="mixbar" id="mixbar">
-        <button class="btn btn--sm" id="barMusic">${icons.music}<span id="barMusicLabel" data-i18n="audio.add"></span></button>
-        <button class="btn btn--icon btn--ghost" id="barMusicClear" hidden aria-label="quitar">${icons.close}</button>
-        <label class="mixbar__level" id="barMusicLevel" hidden>
-          <span class="sr-only" data-i18n="audio.musicLevel"></span>
-          <input type="range" id="musicVol" min="0" max="100" step="5" value="100" />
-        </label>
-        <span class="mixbar__sep"></span>
-        <button class="btn btn--sm" id="barMute" aria-pressed="false">
-          <span id="barMuteIcon">${icons.volume}</span><span data-i18n="audio.videoSound"></span>
-        </button>
-        <label class="mixbar__level" id="barVideoLevel">
-          <span class="sr-only" data-i18n="audio.videoLevel"></span>
-          <input type="range" id="videoVol" min="0" max="100" step="5" value="100" />
-        </label>
-      </div>
-      <span class="empty-note tl__hint" data-i18n="tl.hint"></span>
-      <div class="row stage__actions">
-        <button class="btn btn--accent btn--hero" id="export">${icons.download}<span data-i18n="action.export"></span></button>
-        <button class="btn" id="variant">${icons.wand}<span data-i18n="action.variant"></span></button>
-        <button class="btn" id="share" hidden>${icons.external}<span data-i18n="action.share"></span></button>
-      </div>
-      <label class="toggle stage__toggle"><input type="checkbox" id="safe" /><span data-i18n="safe.label"></span></label>
-      <p class="empty-note" data-i18n="export.hint"></p>
-    </section>
-
     <section class="panel panel--boost" aria-label="boost" id="panel-boost">
       <h2 class="panel__title" data-i18n="section.boost"></h2>
       <div class="entertain" id="entertainBox">
@@ -298,15 +253,6 @@ function shell(): string {
 
     <section class="panel panel--edit" aria-label="edit" id="panel-edit">
       <h2 class="panel__title" data-i18n="section.build"></h2>
-      <span class="empty-note" id="autoWhy" data-i18n="action.autoHint"></span>
-
-      <div class="field">
-        <label data-i18n="quick.label"></label>
-        <div class="chips chips--wrap" id="packs">
-          ${STYLE_PACKS.map((p) => `<button type="button" data-pack="${p.id}" data-i18n="pack.${p.id}"></button>`).join('')}
-        </div>
-      </div>
-
       <details class="disclosure" id="settingsGroup">
         <summary>${icons.sliders}<span data-i18n="group.settings"></span></summary>
         <div class="field">
@@ -408,6 +354,61 @@ function shell(): string {
       </details>
     </section>
 
+    </div>
+
+    <div class="col col--out" id="colOut">
+    <section class="stage" id="stage">
+      <div class="viewport" id="viewport">
+        <div class="viewport__empty" id="viewportEmpty">
+          <ol class="steps">
+            <li data-i18n="onboard.1"></li>
+            <li data-i18n="onboard.2"></li>
+            <li data-i18n="onboard.3"></li>
+          </ol>
+        </div>
+      </div>
+      <div class="transport">
+        <button class="btn btn--icon" id="play" aria-label="play">${icons.play}</button>
+        <div class="scrubwrap">
+          <input type="range" id="scrub" min="0" max="1" step="0.02" value="0" aria-label="timeline" />
+          <div class="ticks" id="ticks" aria-hidden="true"></div>
+        </div>
+        <span class="time" id="time">0.0 / 0.0s</span>
+        <label class="toggle stage__toggle"><input type="checkbox" id="safe" /><span data-i18n="safe.label"></span></label>
+      </div>
+      <div class="tl" id="timeline" hidden></div>
+      <div class="inspector" id="inspector" hidden></div>
+      <div class="mixbar" id="mixbar">
+        <button class="btn btn--sm" id="barMusic">${icons.music}<span id="barMusicLabel" data-i18n="audio.add"></span></button>
+        <button class="btn btn--icon btn--ghost" id="barMusicClear" hidden aria-label="quitar">${icons.close}</button>
+        <label class="mixbar__level" id="barMusicLevel" hidden>
+          <span class="sr-only" data-i18n="audio.musicLevel"></span>
+          <input type="range" id="musicVol" min="0" max="100" step="5" value="100" />
+        </label>
+        <span class="mixbar__sep"></span>
+        <button class="btn btn--sm" id="barMute" aria-pressed="false">
+          <span id="barMuteIcon">${icons.volume}</span><span data-i18n="audio.videoSound"></span>
+        </button>
+        <label class="mixbar__level" id="barVideoLevel">
+          <span class="sr-only" data-i18n="audio.videoLevel"></span>
+          <input type="range" id="videoVol" min="0" max="100" step="5" value="100" />
+        </label>
+      </div>
+      <div class="field looks">
+        <label data-i18n="quick.label"></label>
+        <div class="chips chips--wrap" id="packs">
+          ${STYLE_PACKS.map((p) => `<button type="button" data-pack="${p.id}" data-i18n="pack.${p.id}"></button>`).join('')}
+        </div>
+        <span class="empty-note" id="autoWhy" data-i18n="action.autoHint"></span>
+      </div>
+      <span class="empty-note tl__hint" data-i18n="tl.hint"></span>
+      <div class="row stage__actions">
+        <button class="btn btn--accent btn--hero" id="export">${icons.download}<span data-i18n="action.export"></span></button>
+        <button class="btn" id="variant">${icons.wand}<span data-i18n="action.variant"></span></button>
+        <button class="btn" id="share" hidden>${icons.external}<span data-i18n="action.share"></span></button>
+      </div>
+    </section>
+
     <section class="panel panel--score" aria-label="score" id="panel-score">
       <h2 class="panel__title" data-i18n="score.title"></h2>
       <div id="scoreBody"></div>
@@ -420,6 +421,7 @@ function shell(): string {
         ${SOURCES.map((x) => `<a href="${x.url}" target="_blank" rel="noopener noreferrer">${x.label}</a>`).join('')}
       </div>
     </section>
+    </div>
   </main>
 
   <footer class="footer">
@@ -1761,6 +1763,42 @@ $<HTMLInputElement>('file').addEventListener('change', (e) => {
   input.value = '';
 });
 
+/**
+ * Dropping a file anywhere in the window imports it. Hitting the dashed box was an extra
+ * demand on the user for no reason.
+ */
+let dropDepth = 0;
+window.addEventListener('dragenter', (e) => {
+  if (!e.dataTransfer?.types.includes('Files')) return;
+  dropDepth++;
+  document.body.classList.add('is-dropping');
+});
+window.addEventListener('dragover', (e) => {
+  if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
+});
+window.addEventListener('dragleave', () => {
+  dropDepth = Math.max(0, dropDepth - 1);
+  if (!dropDepth) document.body.classList.remove('is-dropping');
+});
+window.addEventListener('drop', (e) => {
+  dropDepth = 0;
+  document.body.classList.remove('is-dropping');
+  const files = Array.from(e.dataTransfer?.files ?? []);
+  if (!files.length) return;
+  e.preventDefault();
+  const audio = files.filter((f) => f.type.startsWith('audio/'));
+  const media = files.filter((f) => !f.type.startsWith('audio/'));
+  if (media.length) void addFiles(media);
+  // an audio file dropped in is the soundtrack, not another shot
+  if (audio[0]) {
+    const input = $<HTMLInputElement>('audioFile');
+    const dt = new DataTransfer();
+    dt.items.add(audio[0]);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+});
+
 const drop = $('drop');
 for (const evt of ['dragenter', 'dragover']) {
   drop.addEventListener(evt, (e) => {
@@ -2004,6 +2042,10 @@ $<HTMLSelectElement>('lang').addEventListener('change', (e) => {
 function syncHeaderHeight(): void {
   const h = $('topbar').getBoundingClientRect().height;
   document.body.style.setProperty('--header-h', `${Math.round(h)}px`);
+  // the layout is sized against the chrome above it, so the page itself never scrolls
+  const bar = $('toolbar').getBoundingClientRect().height;
+  const foot = document.querySelector('.footer')?.getBoundingClientRect().height ?? 0;
+  document.body.style.setProperty('--toolbar-h', `${Math.round(bar + foot) + 12}px`);
 }
 new ResizeObserver(syncHeaderHeight).observe($('topbar'));
 function syncPreviewScale(): void {
@@ -3122,6 +3164,15 @@ $('undo').addEventListener('click', undo);
 $('redo').addEventListener('click', redo);
 $('demo').addEventListener('click', () => void loadDemo());
 
+/** One group open at a time inside the editor: the column stays short enough to read. */
+$('panel-edit').addEventListener('toggle', (e) => {
+  const opened = e.target as HTMLDetailsElement;
+  if (!opened.open || opened.tagName !== 'DETAILS') return;
+  for (const group of Array.from($('panel-edit').querySelectorAll<HTMLDetailsElement>('details'))) {
+    if (group !== opened) group.open = false;
+  }
+}, true);
+
 window.addEventListener('keydown', (e) => {
   const target = e.target as HTMLElement | null;
   const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
@@ -3259,7 +3310,7 @@ window.addEventListener('hashchange', () => {
   if (SECTIONS.includes(next) && next !== document.body.dataset.section) void setSection(next, false);
 });
 // dev-only handle so the timeline can be inspected from the console while iterating
-if (import.meta.env.DEV) (window as unknown as { maiReel: unknown }).maiReel = { state, get project() { return state.project; } };
+if (import.meta.env.DEV) (window as unknown as { maiReel: unknown }).maiReel = { state, player, get project() { return state.project; } };
 
 void ensureFontsLoaded().then(() => player.seek(state.time));
 
