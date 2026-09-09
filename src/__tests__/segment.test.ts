@@ -73,3 +73,21 @@ describe('shotsFor', () => {
     expect(shotsFor(600, 2, 8)).toBe(8);
   });
 });
+
+describe('planSegments bounds', () => {
+  it('never proposes a shot that outlives its footage', () => {
+    // the envelope can report speech slightly past the real end of the file
+    const segments = planSegments({
+      duration: 5,
+      want: 6,
+      minLen: 0.9,
+      maxLen: 5,
+      voice: voice([
+        [0, 2],
+        [3, 5.2],
+      ]),
+    });
+
+    for (const s of segments) expect(s.srcIn + s.duration).toBeLessThanOrEqual(5.01);
+  });
+});

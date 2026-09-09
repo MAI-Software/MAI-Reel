@@ -1713,6 +1713,134 @@ body[data-view='menu'] .layout {
   align-self: center;
 }
 
+/* ---------- the timeline: the edit seen as a whole, and trimmed there ---------- */
+
+.tl {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+  /* a finger scrolls the track; only the handles capture the gesture, so trimming still works */
+  touch-action: pan-x pan-y;
+}
+
+.tl__track {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  min-width: 100%;
+  height: 56px;
+  padding: 0;
+}
+
+.tl__clip {
+  position: relative;
+  flex: 0 0 auto;
+  height: 56px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-2) center / cover no-repeat;
+  cursor: grab;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* the labels sit on a gradient instead of on a flat wash, so the frame stays recognisable */
+.tl__clip::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(4, 7, 15, 0.55), rgba(4, 7, 15, 0.1) 45%, rgba(4, 7, 15, 0.65));
+  pointer-events: none;
+}
+
+.tl__clip.is-selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.45);
+}
+
+.tl__num {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.tl__len {
+  position: absolute;
+  bottom: 3px;
+  left: 5px;
+  font-size: 10px;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.tl__in {
+  position: absolute;
+  bottom: 3px;
+  right: 6px;
+  font-size: 10px;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* a 10px bar with a 20px grab area, so it works with a finger too */
+.tl__handle {
+  position: absolute;
+  top: 0;
+  width: 10px;
+  height: 100%;
+  background: linear-gradient(var(--primary), var(--primary-2));
+  opacity: 0;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.tl__handle::after {
+  content: '';
+  position: absolute;
+  inset: -6px -8px;
+}
+
+.tl__handle--start {
+  left: 0;
+  border-radius: 7px 0 0 7px;
+}
+
+.tl__handle--end {
+  right: 0;
+  border-radius: 0 7px 7px 0;
+}
+
+.tl__clip.is-selected .tl__handle,
+.tl__clip:hover .tl__handle {
+  opacity: 1;
+}
+
+.tl__playhead {
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 2px;
+  height: calc(100% + 4px);
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+}
+
+.tl__hint {
+  align-self: center;
+}
+
+.block--selected {
+  border-color: var(--primary);
+}
+
 .toolbar .btn--icon {
   min-width: 40px;
 }
@@ -2142,6 +2270,25 @@ body[data-view='all'] .col {
 
   .toolbar {
     padding: 8px 8px 0;
+  }
+
+  .tl__track,
+  .tl__clip {
+    height: 64px;
+  }
+
+  .tl__handle {
+    width: 16px;
+  }
+
+  /* the hint costs a line of a screen that is already tight */
+  .tl__hint {
+    display: none;
+  }
+
+  .tl__handle,
+  .tl__clip.is-selected .tl__handle {
+    opacity: 1;
   }
 
   .stage {

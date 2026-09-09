@@ -54,9 +54,15 @@ function speechSegments(opts: SegmentOptions): SourceSegment[] {
   const close = (): void => {
     const length = end - start;
     if (length < opts.minLen * 0.6) return;
+    const srcIn = Math.max(0, start - 0.12);
+    // the envelope can run a little past the real end of the file, and the padding adds more:
+    // a shot that outlives its footage freezes on its last frame
+    const room = Math.max(0, opts.duration - srcIn);
+    const duration = Math.min(length + 0.2, opts.maxLen, room);
+    if (duration < opts.minLen * 0.5) return;
     out.push({
-      srcIn: Number(Math.max(0, start - 0.12).toFixed(2)),
-      duration: Number(Math.min(length + 0.2, opts.maxLen).toFixed(2)),
+      srcIn: Number(srcIn.toFixed(2)),
+      duration: Number(duration.toFixed(2)),
       score: 0,
       spoken: true,
     });

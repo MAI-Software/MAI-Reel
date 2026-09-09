@@ -28,6 +28,15 @@ Un vídeo importado no es un plano continuo: se mide su propia voz y se parte en
 
 Medido sobre un clip de 16 s que habla 2,6 s de cada 4: 4 planos en `srcIn` 0,33 / 4,38 / 8,38 / 12,38 y 12,9 s de contenido.
 
+## Línea de tiempo
+
+Debajo de la previsualización está el montaje entero: un bloque por plano, ancho proporcional a su duración, con su miniatura, su número, su duración y el punto del vídeo original del que sale.
+
+- **Recortar**: arrastra el borde izquierdo (mueve la entrada dentro del vídeo y mantiene la salida) o el derecho (alarga o acorta, nunca más allá del final del material).
+- **Reordenar**: arrastra el plano entero; en móvil, con las flechas del panel Bloques.
+- **Situarse**: toca un plano para saltar a él, o arrastra sobre la pista para desplazarte.
+- Mínimo 0,4 s por plano. Todo cambio pasa por deshacer/rehacer y se guarda con la sesión.
+
 ## Sonido
 
 - El **audio del vídeo se oye y se exporta** (antes solo salía la música).

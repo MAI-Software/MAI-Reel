@@ -112,7 +112,17 @@ export async function thumbnail(asset: MediaAsset, size = 160): Promise<string> 
   const ctx = c.getContext('2d')!;
   if (asset.kind === 'video') {
     const v = asset.el as HTMLVideoElement;
-    if (v.readyState < 2) await new Promise((r) => v.addEventListener('loadeddata', r, { once: true }));
+    // a restored element can already be past this event, so the wait needs a way out
+    if (v.readyState < 2) {
+      await new Promise<void>((r) => {
+        const done = (): void => {
+          v.removeEventListener('loadeddata', done);
+          r();
+        };
+        v.addEventListener('loadeddata', done, { once: true });
+        setTimeout(done, 2000);
+      });
+    }
     if (v.currentTime < 0.05) await seek(v, Math.min(0.1, asset.srcDuration / 2));
   }
   try {

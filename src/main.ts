@@ -13,6 +13,7 @@ import { FONTS, TEXT_STYLES, ensureFontsLoaded } from './data/typography';
 import { EFFECTS, TRANSITIONS, GRADES } from './data/effects';
 import { profileAssets, type ShotProfile } from './analysis/shot';
 import { planSegments, type SourceSegment } from './engine/segment';
+import { Timeline } from './ui/timeline';
 import { clearSession, isStorageAvailable, putFile, pruneFiles, readFiles, readSession, saveSession } from './engine/store';
 import { composeShots, describeComposition } from './engine/compose';
 import { loadAudioFile, beatsInFragment, drawWaveform, analyzeFileAudio, type SourceAudio } from './engine/audio';
@@ -224,6 +225,8 @@ function shell(): string {
         </div>
         <span class="time" id="time">0.0 / 0.0s</span>
       </div>
+      <div class="tl" id="timeline" hidden></div>
+      <span class="empty-note tl__hint" data-i18n="tl.hint"></span>
       <div class="row stage__actions">
         <button class="btn btn--accent btn--hero" id="export">${icons.download}<span data-i18n="action.export"></span></button>
         <button class="btn" id="variant">${icons.wand}<span data-i18n="action.variant"></span></button>
@@ -445,6 +448,7 @@ const player = new Player(renderer, {
   onTime: (time) => {
     state.time = time;
     updateTransport();
+    timeline?.updatePlayhead();
   },
   safeZones: () => state.showSafeZones,
 });
@@ -525,12 +529,7 @@ async function addFiles(files: File[]): Promise<void> {
   renderTranscribePlayer();
   syncFlowState();
   scheduleSave();
-  for (const a of added) {
-    a.thumb = await thumbnail(a);
-    for (const img of Array.from(document.querySelectorAll<HTMLImageElement>(`img[data-id="${a.id}"]`))) {
-      img.src = a.thumb;
-    }
-  }
+  await paintThumbs(added);
 }
 
 function renderStrip(): void {
@@ -755,18 +754,29 @@ async function restoreSession(): Promise<boolean> {
   markPacks();
   renderStrip();
   renderBlocks();
+  renderTicks();
   renderSeed();
   updateBadges();
   updateTransport();
   scoreStale = true;
   syncFlowState();
+  await paintThumbs(assets);
+  return true;
+}
+
+/** Fills in the thumbnails and puts them on the strip and the timeline. Never fatal. */
+async function paintThumbs(assets: MediaAsset[]): Promise<void> {
   for (const a of assets) {
-    a.thumb = await thumbnail(a);
+    try {
+      a.thumb = await thumbnail(a);
+    } catch {
+      continue;
+    }
     for (const img of Array.from(document.querySelectorAll<HTMLImageElement>(`img[data-id="${a.id}"]`))) {
       img.src = a.thumb;
     }
   }
-  return true;
+  renderTicks();
 }
 
 function touch(): void {
@@ -790,6 +800,8 @@ function scheduleAnalyze(): void {
 }
 
 function renderTicks(): void {
+  // the strip of tick marks and the timeline show the same cuts: they always move together
+  timeline?.render();
   const dur = totalDuration(state.project);
   if (!dur) {
     ticks.innerHTML = '';
@@ -1265,6 +1277,34 @@ async function exportVideo(): Promise<void> {
   }
 }
 
+
+/* ---------- the timeline ---------- */
+
+let timeline: Timeline;
+timeline = new Timeline($('timeline'), {
+  getProject: () => state.project,
+  resolve: assetById,
+  getTime: () => state.time,
+  onSeek: (time) => {
+    player.seek(time);
+    updateTransport();
+  },
+  onChange: () => {
+    // a trim or a reorder changes the whole layout, the score and the saved session
+    relayout(state.project);
+    touch();
+    renderBlocks();
+    renderTicks();
+    player.seek(Math.min(state.time, totalDuration(state.project)));
+  },
+  onSelect: (clipId) => {
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>('.block'))) {
+      el.classList.toggle('block--selected', el.dataset.clip === clipId);
+    }
+    const card = clipId ? document.querySelector<HTMLElement>(`.block[data-clip="${clipId}"]`) : null;
+    card?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  },
+});
 
 /* ---------- the menu and the tool screens ---------- */
 

@@ -129,7 +129,8 @@ export function buildProject(assets: MediaAsset[], opts: BuildOptions): Project 
 
   const push = (source: ShotSource, duration: number, index: number): void => {
     const isVideo = source.asset.kind === 'video';
-    const length = Math.max(0.3, Math.min(duration, source.maxLen));
+    const room = isVideo && source.asset.srcDuration ? source.asset.srcDuration - source.srcIn : Infinity;
+    const length = Math.max(0.3, Math.min(duration, source.maxLen, room));
     clips.push({
       id: uid('c'),
       assetId: source.asset.id,
