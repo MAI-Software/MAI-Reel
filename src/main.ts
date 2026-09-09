@@ -378,6 +378,13 @@ function shell(): string {
       </div>
       <div class="tl" id="timeline" hidden></div>
       <div class="inspector" id="inspector" hidden></div>
+      <div class="field looks">
+        <label data-i18n="quick.label"></label>
+        <div class="chips chips--wrap" id="packs">
+          ${STYLE_PACKS.map((p) => `<button type="button" data-pack="${p.id}" data-i18n="pack.${p.id}"></button>`).join('')}
+        </div>
+        <span class="empty-note" id="autoWhy" data-i18n="action.autoHint"></span>
+      </div>
       <div class="mixbar" id="mixbar">
         <button class="btn btn--sm" id="barMusic">${icons.music}<span id="barMusicLabel" data-i18n="audio.add"></span></button>
         <button class="btn btn--icon btn--ghost" id="barMusicClear" hidden aria-label="quitar">${icons.close}</button>
@@ -393,13 +400,6 @@ function shell(): string {
           <span class="sr-only" data-i18n="audio.videoLevel"></span>
           <input type="range" id="videoVol" min="0" max="100" step="5" value="100" />
         </label>
-      </div>
-      <div class="field looks">
-        <label data-i18n="quick.label"></label>
-        <div class="chips chips--wrap" id="packs">
-          ${STYLE_PACKS.map((p) => `<button type="button" data-pack="${p.id}" data-i18n="pack.${p.id}"></button>`).join('')}
-        </div>
-        <span class="empty-note" id="autoWhy" data-i18n="action.autoHint"></span>
       </div>
       <span class="empty-note tl__hint" data-i18n="tl.hint"></span>
       <div class="row stage__actions">

@@ -41,7 +41,7 @@ Medido sobre un clip de 16 s que habla 2,6 s de cada 4: 4 planos en `srcIn` 0,33
 
 ## Distribución
 
-En pantalla ancha la herramienta son dos columnas: a la izquierda lo que le das (material y preparación) y sus ajustes, a la derecha lo que sale (previsualización fija, línea de tiempo, mezcla y nota). Al seleccionar un plano en la línea de tiempo se abre debajo su **inspector** con efecto, transición, color, duración y recorte de ese plano; no hay una lista con todos los planos porque la línea de tiempo ya los enseña.
+En pantalla ancha la app **no hace scroll**: ocupa exactamente la ventana y son dos columnas que se desplazan por separado. A la izquierda lo que le das (material y preparación) y sus ajustes; a la derecha el resultado, en este orden: previsualización, transporte, línea de tiempo, inspector del plano, estilos, mezcla y los botones de exportar (anclados abajo, nunca se pierden de vista). Al seleccionar un plano en la línea de tiempo se abre debajo su **inspector** con efecto, transición, color, duración y recorte de ese plano; no hay una lista con todos los planos porque la línea de tiempo ya los enseña.
 
 ## Encuadre y capas
 
