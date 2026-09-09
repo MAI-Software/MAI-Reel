@@ -2535,72 +2535,30 @@ body[data-result='0'] .stage > .empty-note {
 }
 
 /* one-screen view: no tabs, everything stacked, the page scrolls */
-body[data-view='all'] .tabbar {
-  display: none;
-}
 
-body[data-view='all'] .panel {
-  display: flex !important;
-  flex: 0 0 auto;
-  overflow: visible;
-}
 
-body[data-view='all'] #blocks,
-body[data-view='all'] .panel--score #scoreBody,
-body[data-view='all'] #multiList {
-  max-height: none;
-  overflow: visible;
-}
 
-body[data-view='all'] .col {
-  overflow: visible;
-}
+
+
+
+
 
 @media (max-width: 1023px) {
-  body[data-view='all'] {
-    overflow: auto;
-    height: auto;
-  }
 
-  body[data-view='all'] #app {
-    height: auto;
-    min-height: 100dvh;
-  }
 
-  body[data-view='all'] .layout {
-    display: flex;
-    flex-direction: column;
-  }
 
-  body[data-view='all'] .stage {
-    position: sticky;
-    top: 0;
-    z-index: 30;
-    background: var(--bg);
-    padding-bottom: 8px;
-  }
 
-  body[data-view='all'] .viewport,
-  body[data-view='all'][data-tab='edit'] .viewport,
-  body[data-view='all'][data-tab='blocks'] .viewport {
-    height: min(30dvh, 300px);
-  }
 
-  body[data-view='all'] .footer {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
 
-  body[data-view='all'] .footer__note,
-  body[data-view='all'] .footer__links {
-    display: flex;
-  }
 
-  body[data-view='all'] .parent-link {
-    display: none;
-  }
+
+
+
+
+
+
+
+
 }
 
 @media (max-width: 1023px) {
@@ -2669,9 +2627,6 @@ body[data-view='all'] .col {
   }
 
   .stage {
-    position: sticky;
-    top: calc(var(--header-h, 55px) + 48px);
-    z-index: 20;
     background: var(--bg);
   }
 
