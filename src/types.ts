@@ -101,8 +101,10 @@ export interface Project {
   fontId: string;
   styleId: string;
   enhance: Enhance;
-  /** How loud the source video is heard, 0..1. */
+  /** How loud the source video is heard, 0..1. Zero mutes every clip. */
   sourceVolume?: number;
+  /** How loud the music track is heard, 0..1, before any ducking. */
+  musicVolume?: number;
   /** Drives the safe area: TikTok, Reels and Shorts each cover different edges. */
   platform?: Platform;
 }

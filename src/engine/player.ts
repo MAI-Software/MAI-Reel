@@ -1,7 +1,7 @@
 import type { MediaAsset, Project } from '../types';
 import { ReelRenderer, totalDuration, clipIndexAt } from './render';
 import type { AudioTrack } from './audio';
-import { attachMusic, attachVideo, resumeAudio, setDuck, setVideoVolume } from './mixer';
+import { attachMusic, attachVideo, resumeAudio, setDuck, setMusicVolume, setVideoVolume } from './mixer';
 
 export interface PlayerHooks {
   getProject: () => Project;
@@ -85,7 +85,10 @@ export class Player {
     const project = this.hooks.getProject();
     const volume = project.sourceVolume ?? 1;
     const music = this.hooks.getAudio();
-    if (music) attachMusic(music.el);
+    if (music) {
+      setMusicVolume(project.musicVolume ?? 1);
+      attachMusic(music.el);
+    }
     for (const clip of project.clips) {
       const asset = this.hooks.resolve(clip.assetId);
       if (!asset || asset.kind !== 'video') continue;

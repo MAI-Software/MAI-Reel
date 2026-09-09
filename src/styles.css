@@ -1837,6 +1837,48 @@ body[data-view='menu'] .layout {
   align-self: center;
 }
 
+/* ---------- the mix bar: music in, clips up or down ---------- */
+
+.mixbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 6px 0 0;
+}
+
+.mixbar__sep {
+  flex: 1 1 auto;
+}
+
+.mixbar__level {
+  display: flex;
+  align-items: center;
+  min-width: 84px;
+  flex: 0 1 130px;
+}
+
+.mixbar__level input[type='range'] {
+  width: 100%;
+}
+
+.mixbar .btn.is-off {
+  color: var(--fg-faint);
+  border-color: var(--border);
+}
+
+.mixbar .btn.is-off svg {
+  color: var(--danger);
+}
+
+#barMusicLabel {
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .block--selected {
   border-color: var(--primary);
 }
@@ -2283,6 +2325,24 @@ body[data-view='all'] .col {
 
   /* the hint costs a line of a screen that is already tight */
   .tl__hint {
+    display: none;
+  }
+
+  .mixbar {
+    gap: 6px;
+  }
+
+  .mixbar__sep {
+    display: none;
+  }
+
+  .mixbar__level {
+    flex: 1 1 84px;
+    min-width: 64px;
+  }
+
+  /* the speaker alone says it on a narrow screen */
+  #barMute span:not(#barMuteIcon) {
     display: none;
   }
 

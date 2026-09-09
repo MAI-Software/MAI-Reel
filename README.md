@@ -39,6 +39,8 @@ Debajo de la previsualización está el montaje entero: un bloque por plano, anc
 
 ## Sonido
 
+Debajo de la línea de tiempo hay una barra de mezcla siempre visible: **Añadir música** (con su nombre, su ✕ y su volumen) y **Sonido del vídeo** (botón de silencio y volumen). Los dos niveles se guardan y sobreviven a un montaje nuevo.
+
 - El **audio del vídeo se oye y se exporta** (antes solo salía la música).
 - La música **baja al 25 % bajo los planos hablados**, en la previsualización y en el archivo final.
 - Todo pasa por un único grafo de Web Audio, así que lo que se escucha es lo que se exporta.

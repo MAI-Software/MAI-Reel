@@ -16,6 +16,8 @@ let dest: MediaStreamAudioDestinationNode | null = null;
 const attached = new WeakMap<HTMLMediaElement, Attachment>();
 let musicGain: GainNode | null = null;
 let duck = 1;
+/** What the user set for the music, kept apart from the automatic ducking. */
+let musicVolume = 1;
 
 function ensure(): { ctx: AudioContext; dest: MediaStreamAudioDestinationNode } | null {
   if (typeof AudioContext === 'undefined') return null;
@@ -49,7 +51,13 @@ function attach(el: HTMLMediaElement, volume: number): GainNode | null {
 }
 
 export function attachMusic(el: HTMLAudioElement): void {
-  musicGain = attach(el, duck);
+  musicGain = attach(el, duck * musicVolume);
+}
+
+/** The music slider. The ducking multiplies this, it does not replace it. */
+export function setMusicVolume(level: number): void {
+  musicVolume = Math.max(0, Math.min(1, level));
+  applyMusicGain();
 }
 
 export function attachVideo(el: HTMLVideoElement, volume = 1): void {
@@ -67,8 +75,12 @@ export function setVideoVolume(el: HTMLVideoElement, volume: number): void {
  */
 export function setDuck(level: number): void {
   duck = Math.max(0, Math.min(1, level));
+  applyMusicGain();
+}
+
+function applyMusicGain(): void {
   if (!musicGain || !ctx) return;
-  musicGain.gain.setTargetAtTime(duck, ctx.currentTime, 0.12);
+  musicGain.gain.setTargetAtTime(duck * musicVolume, ctx.currentTime, 0.12);
 }
 
 /** The mixed stream to record. Null when the browser has no Web Audio. */

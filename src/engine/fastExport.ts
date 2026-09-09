@@ -121,18 +121,19 @@ async function mixdown(opts: FastExportOptions, duration: number): Promise<Audio
     }
   }
 
-  if (opts.music) {
+  if (opts.music && (project.musicVolume ?? 1) > 0.001) {
     const buffer = await decodeAudio(opts.music.file, `music:${opts.music.file.name}`);
     if (buffer) {
       const node = ctx.createBufferSource();
       node.buffer = buffer;
+      const musicVolume = project.musicVolume ?? 1;
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(1, 0);
+      gain.gain.setValueAtTime(musicVolume, 0);
       // the same ducking the preview does, baked in
       for (const clip of project.clips) {
         if (!clip.spoken || sourceVolume < 0.05) continue;
-        gain.gain.setTargetAtTime(0.25, clip.start, 0.12);
-        gain.gain.setTargetAtTime(1, clip.start + clip.duration, 0.2);
+        gain.gain.setTargetAtTime(musicVolume * 0.25, clip.start, 0.12);
+        gain.gain.setTargetAtTime(musicVolume, clip.start + clip.duration, 0.2);
       }
       node.connect(gain).connect(ctx.destination);
       node.start(0, Math.min(opts.music.offset, Math.max(0, buffer.duration - 0.05)), duration);

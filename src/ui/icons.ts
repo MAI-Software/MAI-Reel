@@ -19,6 +19,8 @@ export const icons = {
   external: svg('<path d="M14 5h5v5"/><path d="M19 5 11 13"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/>'),
   globe: svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/>'),
   plus: svg('<path d="M12 5v14"/><path d="M5 12h14"/>'),
+  volume: svg('<path d="M4 9v6h3.5L12 19V5L7.5 9z" fill="currentColor"/><path d="M16 9.2a3.6 3.6 0 0 1 0 5.6"/><path d="M18.4 6.6a7 7 0 0 1 0 10.8"/>'),
+  muted: svg('<path d="M4 9v6h3.5L12 19V5L7.5 9z" fill="currentColor"/><path d="m16 10 4 4"/><path d="m20 10-4 4"/>'),
   undo: svg('<path d="M4 9h11a5 5 0 0 1 0 10h-6"/><path d="m8 5-4 4 4 4"/>'),
   redo: svg('<path d="M20 9H9a5 5 0 0 0 0 10h6"/><path d="m16 5 4 4-4 4"/>'),
   save: svg('<path d="M5 4h11l3 3v13H5z"/><path d="M9 4v5h6V4"/><rect x="8" y="13" width="8" height="7"/>'),

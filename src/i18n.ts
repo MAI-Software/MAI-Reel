@@ -30,6 +30,10 @@ export const SOURCES: Source[] = [
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  'audio.add': 'Añadir música',
+  'audio.videoSound': 'Sonido del vídeo',
+  'audio.musicLevel': 'Volumen de la música',
+  'audio.videoLevel': 'Volumen del vídeo',
   'tl.hint': 'Arrastra los bordes de cada plano para recortarlo, o arrástralo entero para cambiarlo de sitio.',
   'link.nopath': 'Este navegador no puede leer el sonido de otra página, así que el enlace solo se reproduce. Para transcribirlo: descarga el vídeo e impórtalo, ábrelo en Chrome o Edge de escritorio, o configura tu servidor de extracción.',
   'action.share': 'Compartir',
@@ -357,6 +361,10 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  'audio.add': 'Add music',
+  'audio.videoSound': 'Video sound',
+  'audio.musicLevel': 'Music volume',
+  'audio.videoLevel': 'Video volume',
   'tl.hint': 'Drag the edges of a shot to trim it, or drag the shot itself to move it.',
   'link.nopath': 'This browser cannot read the sound of another page, so the link only plays. To transcribe it: download the video and import it, open this on desktop Chrome or Edge, or set up your extraction server.',
   'action.share': 'Share',
@@ -684,6 +692,10 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'audio.add': 'Ajouter une musique',
+  'audio.videoSound': 'Son de la vidéo',
+  'audio.musicLevel': 'Volume de la musique',
+  'audio.videoLevel': 'Volume de la vidéo',
   'tl.hint': 'Faites glisser les bords d’un plan pour le rogner, ou le plan entier pour le déplacer.',
   'link.nopath': 'Ce navigateur ne peut pas lire le son d’une autre page, le lien est donc seulement lu. Pour le transcrire : téléchargez la vidéo et importez-la, ouvrez ceci sur Chrome ou Edge de bureau, ou configurez votre serveur d’extraction.',
   'action.share': 'Partager',
@@ -1011,6 +1023,10 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  'audio.add': 'Musik hinzufügen',
+  'audio.videoSound': 'Videoton',
+  'audio.musicLevel': 'Musiklautstärke',
+  'audio.videoLevel': 'Videolautstärke',
   'tl.hint': 'Zieh die Kanten einer Einstellung, um sie zu kürzen, oder die Einstellung selbst, um sie zu verschieben.',
   'link.nopath': 'Dieser Browser kann den Ton einer anderen Seite nicht lesen, der Link wird also nur abgespielt. Zum Transkribieren: Video herunterladen und importieren, dies in Chrome oder Edge am Desktop öffnen, oder den eigenen Extraktionsserver einrichten.',
   'action.share': 'Teilen',
@@ -1338,6 +1354,10 @@ const de: Dict = {
 };
 
 const it: Dict = {
+  'audio.add': 'Aggiungi musica',
+  'audio.videoSound': 'Audio del video',
+  'audio.musicLevel': 'Volume della musica',
+  'audio.videoLevel': 'Volume del video',
   'tl.hint': 'Trascina i bordi di un’inquadratura per accorciarla, o l’inquadratura stessa per spostarla.',
   'link.nopath': 'Questo browser non può leggere l’audio di un’altra pagina, quindi il link viene solo riprodotto. Per trascriverlo: scarica il video e importalo, apri questa pagina su Chrome o Edge desktop, oppure configura il tuo server di estrazione.',
   'action.share': 'Condividi',

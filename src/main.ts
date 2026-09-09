@@ -14,6 +14,7 @@ import { EFFECTS, TRANSITIONS, GRADES } from './data/effects';
 import { profileAssets, type ShotProfile } from './analysis/shot';
 import { planSegments, type SourceSegment } from './engine/segment';
 import { Timeline } from './ui/timeline';
+import { setMusicVolume, setVideoVolume } from './engine/mixer';
 import { clearSession, isStorageAvailable, putFile, pruneFiles, readFiles, readSession, saveSession } from './engine/store';
 import { composeShots, describeComposition } from './engine/compose';
 import { loadAudioFile, beatsInFragment, drawWaveform, analyzeFileAudio, type SourceAudio } from './engine/audio';
@@ -226,6 +227,22 @@ function shell(): string {
         <span class="time" id="time">0.0 / 0.0s</span>
       </div>
       <div class="tl" id="timeline" hidden></div>
+      <div class="mixbar" id="mixbar">
+        <button class="btn btn--sm" id="barMusic">${icons.music}<span id="barMusicLabel" data-i18n="audio.add"></span></button>
+        <button class="btn btn--icon btn--ghost" id="barMusicClear" hidden aria-label="quitar">${icons.close}</button>
+        <label class="mixbar__level" id="barMusicLevel" hidden>
+          <span class="sr-only" data-i18n="audio.musicLevel"></span>
+          <input type="range" id="musicVol" min="0" max="100" step="5" value="100" />
+        </label>
+        <span class="mixbar__sep"></span>
+        <button class="btn btn--sm" id="barMute" aria-pressed="false">
+          <span id="barMuteIcon">${icons.volume}</span><span data-i18n="audio.videoSound"></span>
+        </button>
+        <label class="mixbar__level" id="barVideoLevel">
+          <span class="sr-only" data-i18n="audio.videoLevel"></span>
+          <input type="range" id="videoVol" min="0" max="100" step="5" value="100" />
+        </label>
+      </div>
       <span class="empty-note tl__hint" data-i18n="tl.hint"></span>
       <div class="row stage__actions">
         <button class="btn btn--accent btn--hero" id="export">${icons.download}<span data-i18n="action.export"></span></button>
@@ -530,6 +547,7 @@ async function addFiles(files: File[]): Promise<void> {
   syncFlowState();
   scheduleSave();
   await paintThumbs(added);
+  applyMix();
 }
 
 function renderStrip(): void {
@@ -761,6 +779,7 @@ async function restoreSession(): Promise<boolean> {
   scoreStale = true;
   syncFlowState();
   await paintThumbs(assets);
+  applyMix();
   return true;
 }
 
@@ -779,8 +798,64 @@ async function paintThumbs(assets: MediaAsset[]): Promise<void> {
   renderTicks();
 }
 
+/* ---------- the mix: music level and how loud the clips are ---------- */
+
+/** Kept outside the project so a rebuild does not throw the choice away. */
+const mix = {
+  source: Number(localStorage.getItem('mai-reel-source-vol') ?? '1'),
+  music: Number(localStorage.getItem('mai-reel-music-vol') ?? '1'),
+};
+
+/** Writes the chosen levels onto the project and into the live audio graph. */
+function applyMix(): void {
+  state.project.sourceVolume = mix.source;
+  state.project.musicVolume = mix.music;
+  setMusicVolume(mix.music);
+  for (const asset of state.assets) {
+    if (asset.kind !== 'video') continue;
+    const el = asset.el as HTMLVideoElement;
+    el.muted = mix.source <= 0.001;
+    setVideoVolume(el, mix.source);
+  }
+  renderMixBar();
+}
+
+function renderMixBar(): void {
+  const hasVideo = state.assets.some((a) => a.kind === 'video');
+  const track = state.audio;
+  $<HTMLButtonElement>('barMusicClear').hidden = !track;
+  $('barMusicLevel').hidden = !track;
+  $('barMusicLabel').textContent = track ? track.name.replace(/\.[^.]+$/, '').slice(0, 22) : t('audio.add');
+  $<HTMLInputElement>('musicVol').value = String(Math.round(mix.music * 100));
+
+  const muted = mix.source <= 0.001;
+  const button = $<HTMLButtonElement>('barMute');
+  button.disabled = !hasVideo;
+  button.setAttribute('aria-pressed', String(muted));
+  button.classList.toggle('is-off', muted);
+  $('barMuteIcon').innerHTML = muted ? icons.muted : icons.volume;
+  $('barVideoLevel').hidden = !hasVideo;
+  $<HTMLInputElement>('videoVol').value = String(Math.round(mix.source * 100));
+}
+
+function setSourceVolume(level: number): void {
+  mix.source = Math.max(0, Math.min(1, level));
+  localStorage.setItem('mai-reel-source-vol', String(mix.source));
+  applyMix();
+  touch();
+}
+
+function setMusicLevel(level: number): void {
+  mix.music = Math.max(0, Math.min(1, level));
+  localStorage.setItem('mai-reel-music-vol', String(mix.music));
+  applyMix();
+  touch();
+}
+
 function touch(): void {
   relayout(state.project);
+  state.project.sourceVolume = mix.source;
+  state.project.musicVolume = mix.music;
   recordHistory();
   scheduleSave();
   scoreStale = true;
@@ -802,6 +877,7 @@ function scheduleAnalyze(): void {
 function renderTicks(): void {
   // the strip of tick marks and the timeline show the same cuts: they always move together
   timeline?.render();
+  renderMixBar();
   const dur = totalDuration(state.project);
   if (!dur) {
     ticks.innerHTML = '';
@@ -1501,6 +1577,7 @@ $<HTMLInputElement>('audioFile').addEventListener('change', async (e) => {
   ($('audioGroup') as HTMLDetailsElement).open = true;
   audioInRange.value = '0';
   renderAudio();
+  applyMix();
   if (track.bpm) toast(`${track.bpm} BPM · ${track.beats.length} ${t('audio.beats')}`);
 });
 $('audioClear').addEventListener('click', () => {
@@ -1510,6 +1587,7 @@ $('audioClear').addEventListener('click', () => {
   snapBeats.checked = false;
   $('audioName').textContent = t('audio.none');
   renderAudio();
+  applyMix();
 });
 audioInRange.addEventListener('input', () => {
   if (!state.audio) return;
@@ -2478,6 +2556,12 @@ $('hub').addEventListener('click', (e) => {
   if (btn) void setSection(btn.dataset.section as Section);
 });
 
+$('barMusic').addEventListener('click', () => $('audioFile').click());
+$('barMusicClear').addEventListener('click', () => $('audioClear').click());
+$('barMute').addEventListener('click', () => setSourceVolume(mix.source > 0.001 ? 0 : 1));
+$('musicVol').addEventListener('input', (e) => setMusicLevel(Number((e.target as HTMLInputElement).value) / 100));
+$('videoVol').addEventListener('input', (e) => setSourceVolume(Number((e.target as HTMLInputElement).value) / 100));
+
 $('toMenu').addEventListener('click', () => setView('menu'));
 $('undo').addEventListener('click', undo);
 $('redo').addEventListener('click', redo);
@@ -2598,6 +2682,7 @@ const openTool = Boolean(location.hash) || Boolean(localStorage.getItem('mai-ree
 document.body.dataset.view = openTool ? 'tool' : 'menu';
 void setSection(firstSection, false);
 syncFlowState();
+applyMix();
 const storedPlatform = localStorage.getItem('mai-reel-platform');
 if (storedPlatform) {
   state.project.platform = storedPlatform as Project['platform'];
