@@ -140,9 +140,14 @@ function shell(): string {
         <span class="progress__label" id="importLabel"></span>
       </div>
       <div class="strip" id="strip"></div>
+      <div class="prep" id="prepList"></div>
       <div class="row row--between">
         <span class="empty-note" id="mediaCount"></span>
         <button class="btn btn--ghost btn--sm" id="clear">${icons.trash}<span data-i18n="media.clear"></span></button>
+      </div>
+      <div class="prep__actions">
+        <button class="btn btn--primary btn--hero" id="magic">${icons.spark}<span data-i18n="prep.magic"></span></button>
+        <button class="btn" id="buildPrep">${icons.wand}<span data-i18n="prep.build"></span></button>
       </div>
     </section>
 
@@ -228,6 +233,7 @@ function shell(): string {
         <span class="time" id="time">0.0 / 0.0s</span>
       </div>
       <div class="tl" id="timeline" hidden></div>
+      <div class="inspector" id="inspector" hidden></div>
       <div class="mixbar" id="mixbar">
         <button class="btn btn--sm" id="barMusic">${icons.music}<span id="barMusicLabel" data-i18n="audio.add"></span></button>
         <button class="btn btn--icon btn--ghost" id="barMusicClear" hidden aria-label="quitar">${icons.close}</button>
@@ -283,19 +289,8 @@ function shell(): string {
       </div>
     </section>
 
-    <section class="panel panel--prep" aria-label="prep" id="panel-prep">
-      <h2 class="panel__title" data-i18n="prep.title"></h2>
-      <p class="empty-note" data-i18n="prep.hint"></p>
-      <div class="prep" id="prepList"></div>
-      <div class="prep__actions">
-        <button class="btn btn--primary btn--hero" id="magic">${icons.spark}<span data-i18n="prep.magic"></span></button>
-        <button class="btn" id="buildPrep">${icons.wand}<span data-i18n="prep.build"></span></button>
-      </div>
-    </section>
-
     <section class="panel panel--edit" aria-label="edit" id="panel-edit">
       <h2 class="panel__title" data-i18n="section.build"></h2>
-      <button class="btn btn--primary btn--hero" id="auto">${icons.spark}<span data-i18n="action.auto"></span></button>
       <span class="empty-note" id="autoWhy" data-i18n="action.autoHint"></span>
 
       <div class="field">
@@ -356,6 +351,7 @@ function shell(): string {
 
       <details class="disclosure" id="textsGroup">
         <summary>${icons.captions}<span data-i18n="group.texts"></span></summary>
+        <div id="blocks"></div>
         <div class="grid-2">
           <div class="field">
             <label for="hook" data-i18n="hook.label"></label>
@@ -395,11 +391,6 @@ function shell(): string {
           <span class="empty-note" id="seedLabel"></span>
         </div>
       </details>
-    </section>
-
-    <section class="panel panel--blocks" aria-label="blocks" id="panel-blocks">
-      <h2 class="panel__title" data-i18n="nav.blocks"></h2>
-      <div id="blocks"></div>
     </section>
 
     <section class="panel panel--score" aria-label="score" id="panel-score">
@@ -860,6 +851,7 @@ function includedAssets(): MediaAsset[] {
 
 function renderPrep(): void {
   const box = $('prepList');
+  syncFlowState();
   if (!state.assets.length) {
     box.innerHTML = `<p class="empty-note">${t('prep.empty')}</p>`;
     return;
@@ -1000,6 +992,7 @@ function scheduleAnalyze(): void {
 function renderTicks(): void {
   // the strip of tick marks and the timeline show the same cuts: they always move together
   timeline?.render();
+  renderInspector();
   renderMixBar();
   const dur = totalDuration(state.project);
   if (!dur) {
@@ -1146,20 +1139,30 @@ function textCard(o: TextOverlay): string {
   </article>`;
 }
 
+/** The texts of the reel. The shots are edited on the timeline, one at a time. */
 function renderBlocks(): void {
-  if (!state.project.clips.length) {
-    blocksBox.innerHTML = `<p class="empty-note">${t('blocks.empty')}</p>`;
-    return;
-  }
   blocksBox.innerHTML = `
-    <h3 class="panel__title">${t('blocks.clips')} <em>${state.project.clips.length}</em></h3>
-    <div class="blocks">${state.project.clips.map((_, i) => clipCard(i)).join('')}</div>
-    <h3 class="panel__title" style="margin-top:16px">${t('blocks.texts')} <em>${state.project.texts.length}</em></h3>
     <div class="blocks">${state.project.texts.map(textCard).join('')}</div>
-    <button class="btn" id="addText">${icons.plus}<span>${t('blocks.addText')}</span></button>`;
+    <button class="btn btn--sm" id="addText">${icons.plus}<span>${t('blocks.addText')}</span></button>`;
 }
 
-blocksBox.addEventListener('click', (e) => {
+/**
+ * The selected shot, right under the timeline. It replaces the old list of every shot: with a
+ * visible timeline, showing all of them at once was the tallest and least useful panel.
+ */
+function renderInspector(): void {
+  const box = $('inspector');
+  const index = state.project.clips.findIndex((c) => c.id === timeline?.selected);
+  if (index < 0) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = clipCard(index);
+}
+
+function onCardClick(e: Event): void {
   const target = e.target as HTMLElement;
   if (target.closest('#addText')) {
     const dur = totalDuration(state.project);
@@ -1232,9 +1235,12 @@ blocksBox.addEventListener('click', (e) => {
     touch();
     renderBlocks();
   }
-});
+}
 
-blocksBox.addEventListener('input', (e) => {
+blocksBox.addEventListener('click', onCardClick);
+$('inspector').addEventListener('click', onCardClick);
+
+function onCardInput(e: Event): void {
   const input = e.target as HTMLInputElement | HTMLSelectElement;
   const field = input.dataset.field;
   const card = input.closest<HTMLElement>('[data-clip],[data-text]');
@@ -1263,7 +1269,10 @@ blocksBox.addEventListener('input', (e) => {
     if (field === 'pos') o.y = POSITIONS.find((p) => p.id === input.value)?.y ?? o.y;
   }
   touch();
-});
+}
+
+blocksBox.addEventListener('input', onCardInput);
+$('inspector').addEventListener('input', onCardInput);
 
 /* ---------- score ---------- */
 
@@ -1496,13 +1505,7 @@ timeline = new Timeline($('timeline'), {
     renderTicks();
     player.seek(Math.min(state.time, totalDuration(state.project)));
   },
-  onSelect: (clipId) => {
-    for (const el of Array.from(document.querySelectorAll<HTMLElement>('.block'))) {
-      el.classList.toggle('block--selected', el.dataset.clip === clipId);
-    }
-    const card = clipId ? document.querySelector<HTMLElement>(`.block[data-clip="${clipId}"]`) : null;
-    card?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  },
+  onSelect: () => renderInspector(),
 });
 
 /* ---------- the menu and the tool screens ---------- */
@@ -1523,6 +1526,9 @@ function syncFlowState(): void {
   const hasResult = state.project.clips.length > 0 || cues.length > 0;
   document.body.dataset.media = hasMedia ? '1' : '0';
   document.body.dataset.result = hasResult ? '1' : '0';
+  const ready = state.assets.length > 0;
+  $<HTMLButtonElement>('magic').disabled = !ready;
+  $<HTMLButtonElement>('buildPrep').disabled = !ready;
 }
 
 /* ---------- tabs ---------- */
@@ -2675,7 +2681,6 @@ $('packs').addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-pack]');
   if (btn) applyPack(btn.dataset.pack!);
 });
-$('auto').addEventListener('click', () => void autoEdit());
 $('hub').addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-section]');
   if (btn) void setSection(btn.dataset.section as Section);

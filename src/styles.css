@@ -144,8 +144,8 @@ button {
 }
 
 /* every panel is a flexible card inside the section layout */
-.panel--blocks #blocks {
-  max-height: 460px;
+#blocks {
+  max-height: 420px;
   overflow-y: auto;
 }
 
@@ -717,7 +717,7 @@ button {
   height: 40px;
 }
 
-.panel--blocks #blocks {
+#blocks {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1415,12 +1415,10 @@ body[data-mode='multi'] .panel--edit > .empty-note:last-child {
 
 /* each tool mounts its own panels and nothing else */
 .panel--media,
-.panel--prep,
 .panel--transcript,
 .panel--boost,
 .panel--multi,
 .panel--edit,
-.panel--blocks,
 .panel--score,
 .stage {
   display: none;
@@ -1432,13 +1430,10 @@ body[data-view='tool'][data-section='boost'] .panel--media,
 body[data-view='tool'][data-section='boost'] .panel--boost,
 body[data-view='tool'][data-section='boost'] .stage,
 body[data-view='tool'][data-section='boost'] .panel--score,
-body[data-view='tool'][data-section='boost'] .panel--blocks,
 body[data-view='tool'][data-section='build'] .panel--media,
-body[data-view='tool'][data-section='build'] .panel--prep,
 body[data-view='tool'][data-section='build'] .panel--edit,
 body[data-view='tool'][data-section='build'] .stage,
 body[data-view='tool'][data-section='build'] .panel--score,
-body[data-view='tool'][data-section='build'] .panel--blocks,
 body[data-view='tool'][data-section='multi'] .panel--media,
 body[data-view='tool'][data-section='multi'] .panel--multi,
 body[data-view='tool'][data-section='multi'] .stage,
@@ -1449,10 +1444,6 @@ body[data-view='tool'][data-section='multi'] .panel--score {
 /* material, what the user decides about it, the controls, then what came out */
 .panel--media {
   order: 0;
-}
-
-.panel--prep {
-  order: 1;
 }
 
 .panel--transcript,
@@ -1470,12 +1461,20 @@ body[data-view='tool'][data-section='multi'] .panel--score {
   order: 4;
 }
 
-.panel--blocks {
-  order: 5;
-}
+
 
 /* pasting a link only makes sense where a link can be read */
 body:not([data-section='transcribe']) .linkbox {
+  display: none;
+}
+
+/* the creator prepares its clips as cards; the other tools only need the thumbnails */
+body[data-section='build'] .strip {
+  display: none;
+}
+
+body:not([data-section='build']) .prep,
+body:not([data-section='build']) .prep__actions {
   display: none;
 }
 
@@ -1843,6 +1842,20 @@ body[data-view='menu'] .layout {
   align-self: center;
 }
 
+/* ---------- the selected shot, under the timeline ---------- */
+
+.inspector {
+  width: 100%;
+}
+
+.inspector .block {
+  margin: 0;
+}
+
+.inspector .block__grid {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
 /* ---------- preparation: the material before it becomes an edit ---------- */
 
 .prep {
@@ -1904,13 +1917,17 @@ body[data-view='menu'] .layout {
 
 .prep__actions {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .prep__actions .btn--hero {
-  flex: 1 1 auto;
-  width: auto;
+  width: 100%;
+}
+
+.prep__actions .btn:not(.btn--hero) {
+  width: 100%;
+  min-height: 40px;
 }
 
 /* ---------- the mix bar: music in, clips up or down ---------- */
@@ -2175,16 +2192,36 @@ body[data-result='0'] .stage > .empty-note {
   .tabbar {
     display: none;
   }
+  /* two columns: what you feed it on the left, what came out on the right */
   .layout {
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+    align-items: start;
+    gap: 14px;
   }
-  /* on a wide screen the preview sits next to the material instead of below it */
+
+  .panel--media,
+  .panel--transcript,
+  .panel--boost,
+  .panel--multi,
+  .panel--edit {
+    grid-column: 1;
+  }
+
+  .stage,
+  .panel--score {
+    grid-column: 2;
+  }
+
+  /* transcribing has no preview, so the transcript itself takes the right column */
+  body[data-section='transcribe'] .panel--transcript {
+    grid-column: 2;
+  }
+
   .stage {
     order: 0;
-  }
-  .panel.panel--blocks {
-    flex: 1 1 58%;
-    min-height: 200px;
+    position: sticky;
+    top: calc(var(--header-h, 64px) + 8px);
   }
   .panel.panel--score {
     flex: 1 1 42%;
@@ -2313,7 +2350,7 @@ body[data-view='all'] .panel {
   overflow: visible;
 }
 
-body[data-view='all'] .panel--blocks #blocks,
+body[data-view='all'] #blocks,
 body[data-view='all'] .panel--score #scoreBody,
 body[data-view='all'] #multiList {
   max-height: none;
