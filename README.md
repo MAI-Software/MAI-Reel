@@ -17,6 +17,15 @@ La app abre en un **menú** con las cuatro herramientas. Al elegir una se entra 
 
 La sección se guarda y va en el hash (`#transcribe`, `#boost`, `#build`, `#multi`), así que se puede enlazar directamente.
 
+## Preparar antes de montar
+
+En **Crear** el material y su preparación son el mismo panel: importas todos los clips que quieras (varios a la vez, arrastrando o desde el selector) y cada uno aparece como una tarjeta con su miniatura, sus controles de **entrada y salida**, flechas para ordenarlo y una ✕ para dejarlo fuera. La miniatura se vuelve a sacar en el punto de entrada que elijas.
+
+Después hay dos caminos:
+
+- **Hacer magia** — olvida todo lo anterior (vuelve a incluir todo y quita los recortes) y deja que el montador decida duración, cortes, efectos, color y textos.
+- **Montar con mis recortes** — respeta lo que hayas decidido: un clip recortado a mano entra como un solo plano con ese trozo exacto, uno intacto se sigue troceando por voz, y lo que hayas quitado no aparece.
+
 ## Cómo corta
 
 Un vídeo importado no es un plano continuo: se mide su propia voz y se parte en varios planos.
@@ -27,6 +36,10 @@ Un vídeo importado no es un plano continuo: se mide su propia voz y se parte en
 - Sin voz utilizable, los planos se reparten por el vídeo y se prefieren los tramos con más energía.
 
 Medido sobre un clip de 16 s que habla 2,6 s de cada 4: 4 planos en `srcIn` 0,33 / 4,38 / 8,38 / 12,38 y 12,9 s de contenido.
+
+## Distribución
+
+En pantalla ancha la herramienta son dos columnas: a la izquierda lo que le das (material y preparación) y sus ajustes, a la derecha lo que sale (previsualización fija, línea de tiempo, mezcla y nota). Al seleccionar un plano en la línea de tiempo se abre debajo su **inspector** con efecto, transición, color, duración y recorte de ese plano; no hay una lista con todos los planos porque la línea de tiempo ya los enseña.
 
 ## Línea de tiempo
 

@@ -2457,6 +2457,8 @@ async function autoEdit(): Promise<void> {
     renderTicks();
     renderBlocks();
     renderScore();
+    // on one column the result is below the fold: take the user to it
+    if (window.innerWidth < 1024) $('stage').scrollIntoView({ behavior: 'smooth', block: 'start' });
     toast(`${t('auto.done')} ${result.score}/100`);
   } finally {
     analyzing = false;
