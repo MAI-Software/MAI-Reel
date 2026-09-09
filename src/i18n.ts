@@ -30,6 +30,15 @@ export const SOURCES: Source[] = [
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  'prep.title': 'Preparar el material',
+  'prep.hint': 'Ordena, quita lo que no quieras y recorta cada clip. O pulsa Hacer magia y se decide todo solo.',
+  'prep.magic': 'Hacer magia',
+  'prep.build': 'Montar con mis recortes',
+  'prep.empty': 'Importa clips para prepararlos.',
+  'prep.still': 'Foto',
+  'prep.in': 'Entrada',
+  'prep.out': 'Salida',
+  'prep.toggle': 'Incluir o quitar',
   'audio.add': 'Añadir música',
   'audio.videoSound': 'Sonido del vídeo',
   'audio.musicLevel': 'Volumen de la música',
@@ -361,6 +370,15 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  'prep.title': 'Prepare the material',
+  'prep.hint': 'Reorder, drop what you do not want and trim each clip. Or press Magic and let it decide.',
+  'prep.magic': 'Magic',
+  'prep.build': 'Build with my trims',
+  'prep.empty': 'Import clips to prepare them.',
+  'prep.still': 'Photo',
+  'prep.in': 'In',
+  'prep.out': 'Out',
+  'prep.toggle': 'Include or drop',
   'audio.add': 'Add music',
   'audio.videoSound': 'Video sound',
   'audio.musicLevel': 'Music volume',
@@ -692,6 +710,15 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'prep.title': 'Préparer le matériel',
+  'prep.hint': 'Réorganisez, retirez ce que vous ne voulez pas et rognez chaque clip. Ou appuyez sur Magie et tout se décide seul.',
+  'prep.magic': 'Magie',
+  'prep.build': 'Monter avec mes coupes',
+  'prep.empty': 'Importez des clips pour les préparer.',
+  'prep.still': 'Photo',
+  'prep.in': 'Entrée',
+  'prep.out': 'Sortie',
+  'prep.toggle': 'Inclure ou retirer',
   'audio.add': 'Ajouter une musique',
   'audio.videoSound': 'Son de la vidéo',
   'audio.musicLevel': 'Volume de la musique',
@@ -1023,6 +1050,15 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  'prep.title': 'Material vorbereiten',
+  'prep.hint': 'Sortieren, Aussortieren und jeden Clip kürzen. Oder Magie drücken und alles entscheiden lassen.',
+  'prep.magic': 'Magie',
+  'prep.build': 'Mit meinen Schnitten bauen',
+  'prep.empty': 'Importiere Clips, um sie vorzubereiten.',
+  'prep.still': 'Foto',
+  'prep.in': 'Anfang',
+  'prep.out': 'Ende',
+  'prep.toggle': 'Aufnehmen oder entfernen',
   'audio.add': 'Musik hinzufügen',
   'audio.videoSound': 'Videoton',
   'audio.musicLevel': 'Musiklautstärke',
@@ -1354,6 +1390,15 @@ const de: Dict = {
 };
 
 const it: Dict = {
+  'prep.title': 'Preparare il materiale',
+  'prep.hint': 'Riordina, togli quello che non vuoi e taglia ogni clip. Oppure premi Magia e decide tutto da solo.',
+  'prep.magic': 'Magia',
+  'prep.build': 'Monta con i miei tagli',
+  'prep.empty': 'Importa clip per prepararle.',
+  'prep.still': 'Foto',
+  'prep.in': 'Inizio',
+  'prep.out': 'Fine',
+  'prep.toggle': 'Includere o togliere',
   'audio.add': 'Aggiungi musica',
   'audio.videoSound': 'Audio del video',
   'audio.musicLevel': 'Volume della musica',

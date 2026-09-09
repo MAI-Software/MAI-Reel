@@ -16,9 +16,17 @@ export interface StoredFile {
   blob: Blob;
 }
 
+/** What the user decided about a source clip before the edit was built. */
+export interface StoredPrep {
+  include: boolean;
+  in: number;
+  out: number;
+}
+
 export interface StoredSession {
   project: Project;
   order: string[];
+  prep?: Record<string, StoredPrep>;
   packId?: string;
   section?: string;
   savedAt: number;

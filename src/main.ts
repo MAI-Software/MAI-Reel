@@ -2,7 +2,7 @@ import './styles.css';
 import { state, assetById, uid } from './state';
 import { setLang, t, tf, SOURCES, LANGS, LANG_NAMES, type Lang } from './i18n';
 import { icons, brandMark } from './ui/icons';
-import { loadFiles, thumbnail } from './engine/media';
+import { loadFiles, seek as seekVideo, thumbnail } from './engine/media';
 import { buildProject, relayout, appendAssets, buildCaptions, TEMPLATES } from './engine/autoedit';
 import { ReelRenderer, SIZES, totalDuration } from './engine/render';
 import { Player } from './engine/player';
@@ -14,6 +14,7 @@ import { EFFECTS, TRANSITIONS, GRADES } from './data/effects';
 import { profileAssets, type ShotProfile } from './analysis/shot';
 import { planSegments, type SourceSegment } from './engine/segment';
 import { Timeline } from './ui/timeline';
+import { reorder } from './engine/trim';
 import { setMusicVolume, setVideoVolume } from './engine/mixer';
 import { clearSession, isStorageAvailable, putFile, pruneFiles, readFiles, readSession, saveSession } from './engine/store';
 import { composeShots, describeComposition } from './engine/compose';
@@ -282,6 +283,16 @@ function shell(): string {
       </div>
     </section>
 
+    <section class="panel panel--prep" aria-label="prep" id="panel-prep">
+      <h2 class="panel__title" data-i18n="prep.title"></h2>
+      <p class="empty-note" data-i18n="prep.hint"></p>
+      <div class="prep" id="prepList"></div>
+      <div class="prep__actions">
+        <button class="btn btn--primary btn--hero" id="magic">${icons.spark}<span data-i18n="prep.magic"></span></button>
+        <button class="btn" id="buildPrep">${icons.wand}<span data-i18n="prep.build"></span></button>
+      </div>
+    </section>
+
     <section class="panel panel--edit" aria-label="edit" id="panel-edit">
       <h2 class="panel__title" data-i18n="section.build"></h2>
       <button class="btn btn--primary btn--hero" id="auto">${icons.spark}<span data-i18n="action.auto"></span></button>
@@ -543,6 +554,7 @@ async function addFiles(files: File[]): Promise<void> {
   }
   renderStrip();
   renderBlocks();
+  renderPrep();
   renderTranscribePlayer();
   syncFlowState();
   scheduleSave();
@@ -587,8 +599,10 @@ const segmentCache = new Map<string, SourceSegment[]>();
  */
 async function ensureSegments(): Promise<Map<string, SourceSegment[]>> {
   const out = new Map<string, SourceSegment[]>();
-  for (const asset of state.assets) {
+  for (const asset of includedAssets()) {
     if (asset.kind !== 'video' || !asset.srcDuration) continue;
+    const kept = prepFor(asset);
+    const trimmed = kept.in > 0.05 || kept.out < asset.srcDuration - 0.05;
     let segments = segmentCache.get(asset.id);
     if (!segments) {
       const audio = asset.file ? await analyzeFileAudio(asset.file).catch(() => null) : null;
@@ -601,6 +615,18 @@ async function ensureSegments(): Promise<Map<string, SourceSegment[]>> {
         voice,
         audio,
       });
+      // a hand trim wins over the automatic cutting: it is an explicit decision
+      if (trimmed) {
+        const span = kept.out - kept.in;
+        const inside = segments
+          .map((seg) => {
+            const from = Math.max(seg.srcIn, kept.in);
+            const to = Math.min(seg.srcIn + seg.duration, kept.out);
+            return { ...seg, srcIn: Number(from.toFixed(2)), duration: Number((to - from).toFixed(2)) };
+          })
+          .filter((seg) => seg.duration > 0.5);
+        segments = inside.length && span > 2.5 ? inside : [{ srcIn: kept.in, duration: span, score: 0.6, spoken: false }];
+      }
       segmentCache.set(asset.id, segments);
     }
     out.set(asset.id, segments);
@@ -723,6 +749,7 @@ async function persist(): Promise<void> {
     await saveSession({
       project: state.project,
       order,
+      prep: Object.fromEntries(Array.from(prep.entries()).map(([id, e]) => [id, { ...e }])),
       packId: state.packId ?? undefined,
       section: document.body.dataset.section ?? undefined,
       savedAt: Date.now(),
@@ -760,6 +787,8 @@ async function restoreSession(): Promise<boolean> {
 
   state.assets = assets;
   state.project = session.project;
+  prep.clear();
+  for (const [id, entry] of Object.entries(session.prep ?? {})) prep.set(id, { ...entry });
   if (session.packId) state.packId = session.packId;
   templateSel.value = state.project.template;
   aspectSel.value = state.project.aspect;
@@ -772,6 +801,7 @@ async function restoreSession(): Promise<boolean> {
   markPacks();
   renderStrip();
   renderBlocks();
+  renderPrep();
   renderTicks();
   renderSeed();
   updateBadges();
@@ -796,6 +826,99 @@ async function paintThumbs(assets: MediaAsset[]): Promise<void> {
     }
   }
   renderTicks();
+}
+
+/* ---------- preparation: what goes in, and which part of it ---------- */
+
+interface PrepEntry {
+  include: boolean;
+  in: number;
+  out: number;
+}
+
+/** assetId -> what the user kept of that clip. Absent means "all of it". */
+const prep = new Map<string, PrepEntry>();
+
+function prepFor(asset: MediaAsset): PrepEntry {
+  const found = prep.get(asset.id);
+  if (found) return found;
+  const entry: PrepEntry = { include: true, in: 0, out: asset.kind === 'video' ? asset.srcDuration : 0 };
+  prep.set(asset.id, entry);
+  return entry;
+}
+
+/** Drops entries for material that is no longer imported. */
+function prunePrep(): void {
+  const alive = new Set(state.assets.map((a) => a.id));
+  for (const id of Array.from(prep.keys())) if (!alive.has(id)) prep.delete(id);
+}
+
+function includedAssets(): MediaAsset[] {
+  const kept = state.assets.filter((a) => prepFor(a).include);
+  return kept.length ? kept : state.assets;
+}
+
+function renderPrep(): void {
+  const box = $('prepList');
+  if (!state.assets.length) {
+    box.innerHTML = `<p class="empty-note">${t('prep.empty')}</p>`;
+    return;
+  }
+  prunePrep();
+  box.innerHTML = state.assets
+    .map((asset, i) => {
+      const entry = prepFor(asset);
+      const isVideo = asset.kind === 'video';
+      const span = isVideo ? entry.out - entry.in : 0;
+      return `<article class="prepcard${entry.include ? '' : ' is-out'}" data-asset="${asset.id}">
+        <img class="prepcard__thumb" data-id="${asset.id}" src="${asset.thumb ?? ''}" alt="" />
+        <div class="prepcard__body">
+          <strong>${i + 1}. ${asset.name.replace(/\.[^.]+$/, '').slice(0, 26)}</strong>
+          <span class="empty-note">${
+            isVideo ? `${entry.in.toFixed(1)}s → ${entry.out.toFixed(1)}s · ${span.toFixed(1)}s` : t('prep.still')
+          }</span>
+          ${
+            isVideo
+              ? `<label class="prepcard__range"><span class="sr-only">${t('prep.in')}</span>
+                  <input type="range" data-prep="in" min="0" max="${asset.srcDuration.toFixed(1)}" step="0.1" value="${entry.in}" />
+                </label>
+                <label class="prepcard__range"><span class="sr-only">${t('prep.out')}</span>
+                  <input type="range" data-prep="out" min="0" max="${asset.srcDuration.toFixed(1)}" step="0.1" value="${entry.out}" />
+                </label>`
+              : ''
+          }
+        </div>
+        <div class="prepcard__actions">
+          <button class="btn btn--icon btn--ghost" data-prep="up" aria-label="${t('clip.up')}" ${i === 0 ? 'disabled' : ''}>${icons.up}</button>
+          <button class="btn btn--icon btn--ghost" data-prep="down" aria-label="${t('clip.down')}" ${
+            i === state.assets.length - 1 ? 'disabled' : ''
+          }>${icons.down}</button>
+          <button class="btn btn--icon btn--ghost" data-prep="toggle" aria-pressed="${!entry.include}" aria-label="${t('prep.toggle')}">${icons.close}</button>
+        </div>
+      </article>`;
+    })
+    .join('');
+}
+
+/** Re-shoots the thumbnail at the chosen in point, so the card shows where the shot starts. */
+let prepThumbTimer = 0;
+function refreshPrepThumb(asset: MediaAsset, at: number): void {
+  if (asset.kind !== 'video') return;
+  clearTimeout(prepThumbTimer);
+  prepThumbTimer = window.setTimeout(() => {
+    void (async () => {
+      const video = asset.el as HTMLVideoElement;
+      await seekVideo(video, at);
+      try {
+        asset.thumb = await thumbnail(asset);
+      } catch {
+        return;
+      }
+      for (const img of Array.from(document.querySelectorAll<HTMLImageElement>(`img[data-id="${asset.id}"]`))) {
+        img.src = asset.thumb;
+      }
+    })();
+  }, 220);
 }
 
 /* ---------- the mix: music level and how loud the clips are ---------- */
@@ -1449,6 +1572,8 @@ $('clear').addEventListener('click', () => {
   for (const a of state.assets) URL.revokeObjectURL(a.url);
   state.assets = [];
   segmentCache.clear();
+  prep.clear();
+  renderPrep();
   savedFiles.clear();
   undoStack = [];
   historyAt = -1;
@@ -2293,7 +2418,7 @@ async function autoEdit(): Promise<void> {
       assetRank.set(clip.assetId, Math.max(assetRank.get(clip.assetId) ?? 0, value));
     }
     const result = autoDirect({
-      assets: state.assets,
+      assets: includedAssets(),
       stats,
       profiles: shotProfiles,
       segments,
@@ -2555,6 +2680,58 @@ $('hub').addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-section]');
   if (btn) void setSection(btn.dataset.section as Section);
 });
+
+$('prepList').addEventListener('input', (e) => {
+  const input = e.target as HTMLInputElement;
+  const card = input.closest<HTMLElement>('.prepcard');
+  const asset = card && state.assets.find((a) => a.id === card.dataset.asset);
+  if (!asset || !input.dataset.prep) return;
+  const entry = prepFor(asset);
+  const value = Number(input.value);
+  if (input.dataset.prep === 'in') {
+    entry.in = Math.min(value, entry.out - 0.4);
+    refreshPrepThumb(asset, entry.in);
+  } else if (input.dataset.prep === 'out') {
+    entry.out = Math.max(value, entry.in + 0.4);
+  }
+  segmentCache.delete(asset.id);
+  const label = card.querySelector('.empty-note');
+  if (label) label.textContent = `${entry.in.toFixed(1)}s → ${entry.out.toFixed(1)}s · ${(entry.out - entry.in).toFixed(1)}s`;
+  scheduleSave();
+});
+
+$('prepList').addEventListener('click', (e) => {
+  const button = (e.target as HTMLElement).closest<HTMLElement>('[data-prep]');
+  const card = (e.target as HTMLElement).closest<HTMLElement>('.prepcard');
+  if (!button || !card || button.tagName !== 'BUTTON') return;
+  const index = state.assets.findIndex((a) => a.id === card.dataset.asset);
+  const asset = state.assets[index];
+  if (!asset) return;
+
+  if (button.dataset.prep === 'toggle') {
+    const entry = prepFor(asset);
+    entry.include = !entry.include;
+  } else {
+    const to = button.dataset.prep === 'up' ? index - 1 : index + 1;
+    if (to < 0 || to >= state.assets.length) return;
+    state.assets = reorder(state.assets, index, to);
+  }
+  renderPrep();
+  renderStrip();
+  scheduleSave();
+});
+
+$('magic').addEventListener('click', () => {
+  // magic means "decide everything for me": nothing stays excluded, nothing stays trimmed
+  for (const asset of state.assets) {
+    prep.set(asset.id, { include: true, in: 0, out: asset.kind === 'video' ? asset.srcDuration : 0 });
+    segmentCache.delete(asset.id);
+  }
+  renderPrep();
+  void autoEdit();
+});
+
+$('buildPrep').addEventListener('click', () => void autoEdit());
 
 $('barMusic').addEventListener('click', () => $('audioFile').click());
 $('barMusicClear').addEventListener('click', () => $('audioClear').click());
