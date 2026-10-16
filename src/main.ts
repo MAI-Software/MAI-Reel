@@ -252,7 +252,7 @@ function shell(): string {
     </section>
 
     <section class="panel panel--edit" aria-label="edit" id="panel-edit">
-      <h2 class="panel__title" data-i18n="section.build"></h2>
+      <h2 class="panel__title" data-i18n="group.settingsTitle"></h2>
       <details class="disclosure" id="settingsGroup">
         <summary>${icons.sliders}<span data-i18n="group.settings"></span></summary>
         <div class="field">
@@ -401,7 +401,7 @@ function shell(): string {
           <input type="range" id="videoVol" min="0" max="100" step="5" value="100" />
         </label>
       </div>
-      <span class="empty-note tl__hint" data-i18n="tl.hint"></span>
+      <span class="empty-note tl__hint" id="tlHint" data-i18n="tl.hint"></span>
       <div class="row stage__actions">
         <button class="btn btn--accent btn--hero" id="export">${icons.download}<span data-i18n="action.export"></span></button>
         <button class="btn" id="variant">${icons.wand}<span data-i18n="action.variant"></span></button>
@@ -1432,7 +1432,7 @@ function renderScore(): void {
     <div class="score">
       ${gauge(score.total)}
       <div class="score__text">
-        <h3>${t('score.title')}</h3>
+        <p class="score__label">${t('score.title')}</p>
         ${analyzing ? `<span class="pill pill--live">${t('score.updating')}</span>` : scoreStale ? `<span class="pill">${t('score.stale')}</span>` : ''}
         <p>${t('score.sub')}</p>
       </div>
@@ -1726,7 +1726,14 @@ timeline = new Timeline($('timeline'), {
     renderTicks();
     player.seek(Math.min(state.time, totalDuration(state.project)));
   },
-  onSelect: () => renderInspector(),
+  onSelect: () => {
+    renderInspector();
+    // the hint explains the timeline once; after the first use it only takes space
+    if (!localStorage.getItem('mai-reel-tl-used')) {
+      localStorage.setItem('mai-reel-tl-used', '1');
+      $('tlHint').hidden = true;
+    }
+  },
 });
 
 /* ---------- the menu and the tool screens ---------- */
@@ -2729,7 +2736,10 @@ async function autoEdit(): Promise<void> {
     renderBlocks();
     renderScore();
     // on one column the result is below the fold: take the user to it
-    if (window.innerWidth < 1024) $('stage').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (window.innerWidth < 1024) {
+      const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      $('stage').scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
+    }
     toast(`${t('auto.done')} ${result.score}/100`);
   } finally {
     analyzing = false;
@@ -3289,6 +3299,7 @@ document.body.dataset.view = openTool ? 'tool' : 'menu';
 void setSection(firstSection, false);
 syncFlowState();
 applyMix();
+if (localStorage.getItem('mai-reel-tl-used')) $('tlHint').hidden = true;
 const storedResolution = localStorage.getItem('mai-reel-resolution');
 if (storedResolution) {
   state.project.resolution = Number(storedResolution);

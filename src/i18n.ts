@@ -30,6 +30,7 @@ export const SOURCES: Source[] = [
 type Dict = Record<string, string>;
 
 const es: Dict = {
+  'group.settingsTitle': 'Ajustes',
   'prep.move': 'Mover',
   'prep.preview': 'Ver este clip',
   'score.tipsMore': 'Más consejos',
@@ -384,6 +385,7 @@ const es: Dict = {
 };
 
 const en: Dict = {
+  'group.settingsTitle': 'Settings',
   'prep.move': 'Move',
   'prep.preview': 'Preview this clip',
   'score.tipsMore': 'More tips',
@@ -738,6 +740,7 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'group.settingsTitle': 'Réglages',
   'prep.move': 'Déplacer',
   'prep.preview': 'Voir ce clip',
   'score.tipsMore': 'Autres conseils',
@@ -1092,6 +1095,7 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  'group.settingsTitle': 'Einstellungen',
   'prep.move': 'Verschieben',
   'prep.preview': 'Diesen Clip ansehen',
   'score.tipsMore': 'Weitere Tipps',
@@ -1446,6 +1450,7 @@ const de: Dict = {
 };
 
 const it: Dict = {
+  'group.settingsTitle': 'Impostazioni',
   'prep.move': 'Sposta',
   'prep.preview': 'Vedi questa clip',
   'score.tipsMore': 'Altri consigli',

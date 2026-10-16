@@ -9,6 +9,9 @@
   --fg-faint: #8b93ad;
   --primary: #ec4899;
   --primary-2: #db2777;
+  /* fills that carry white text: #ec4899 gives 3.5:1, these give 4.6:1 and 6.0:1 (WCAG AA) */
+  --primary-fill: #db2777;
+  --primary-fill-2: #be185d;
   --accent: #2563eb;
   --ok: #22c55e;
   --warn: #f59e0b;
@@ -300,13 +303,13 @@ button {
 }
 
 .btn--primary {
-  background: var(--primary);
-  border-color: var(--primary);
+  background: linear-gradient(180deg, var(--primary-fill), var(--primary-fill-2));
+  border-color: var(--primary-fill);
   color: #fff;
 }
 
 .btn--primary:hover {
-  background: var(--primary-2);
+  background: var(--primary-fill-2);
 }
 
 .btn--accent {
@@ -406,7 +409,7 @@ button {
   position: absolute;
   left: 4px;
   bottom: 4px;
-  font-size: 10px;
+  font-size: 12px;
   padding: 2px 5px;
   border-radius: 6px;
   background: rgba(4, 7, 15, 0.75);
@@ -459,13 +462,16 @@ button {
 }
 
 .gauge__unit {
-  font-size: 11px;
+  font-size: 12px;
   fill: var(--fg-faint);
 }
 
-.score__text h3 {
+.score__text h3,
+.score__text .score__label {
   margin: 0 0 4px;
   font-size: 17px;
+  font-weight: 700;
+  color: var(--fg);
 }
 
 .score__text p {
@@ -512,7 +518,7 @@ button {
 }
 
 .factor__detail {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--fg-faint);
   margin-top: 4px;
   display: flex;
@@ -550,7 +556,7 @@ button {
 }
 
 .tip__meta {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--fg-faint);
   display: flex;
   gap: 8px;
@@ -562,7 +568,7 @@ button {
 }
 
 .sources {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--fg-faint);
   display: flex;
   flex-wrap: wrap;
@@ -660,7 +666,7 @@ button {
 }
 
 .block__tag {
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   padding: 3px 8px;
@@ -670,7 +676,7 @@ button {
 }
 
 .block__tag--hook {
-  background: var(--primary);
+  background: var(--primary-fill-2);
   color: #fff;
 }
 
@@ -861,7 +867,7 @@ body[data-scrolled='true'] .topbar {
 
 .pill {
   display: inline-block;
-  font-size: 11px;
+  font-size: 12px;
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--muted);
@@ -1015,7 +1021,7 @@ body[data-scrolled='true'] .topbar {
 
 .footer__note {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--fg-faint);
   flex: 1 1 auto;
   overflow: hidden;
@@ -1044,11 +1050,11 @@ body[data-scrolled='true'] .topbar {
   right: 50%;
   transform: translateX(22px);
   font-style: normal;
-  font-size: 10px;
+  font-size: 12px;
   min-width: 18px;
   padding: 1px 5px;
   border-radius: 999px;
-  background: var(--primary);
+  background: var(--primary-fill-2);
   color: #fff;
   font-variant-numeric: tabular-nums;
 }
@@ -1091,7 +1097,7 @@ body[data-scrolled='true'] .topbar {
 
 .parent-link small {
   color: var(--fg-faint);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .parent-link .brand__mark {
@@ -1129,7 +1135,7 @@ body[data-scrolled='true'] .topbar {
 }
 
 .segmented button[aria-pressed='true'] {
-  background: var(--primary);
+  background: var(--primary-fill-2);
   color: #fff;
 }
 
@@ -1250,7 +1256,7 @@ body[data-mode='multi'] .panel--edit > .empty-note:last-child {
 }
 
 .chips button[aria-pressed='true'] {
-  background: var(--primary);
+  background: var(--primary-fill-2);
   border-color: var(--primary);
   color: #fff;
 }
@@ -1303,7 +1309,7 @@ body[data-mode='multi'] .panel--edit > .empty-note:last-child {
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg-faint);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .tabbar button[aria-selected='true'] {
@@ -1569,7 +1575,7 @@ body[data-media='1'] .dropzone p {
 }
 
 .cues button.is-active {
-  background: var(--primary);
+  background: var(--primary-fill-2);
   color: #fff;
 }
 
@@ -1768,7 +1774,7 @@ body[data-view='menu'] .layout {
   position: absolute;
   top: 3px;
   left: 5px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: #fff;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
@@ -1778,7 +1784,9 @@ body[data-view='menu'] .layout {
   position: absolute;
   bottom: 3px;
   left: 5px;
-  font-size: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
   color: var(--fg-dim);
   font-variant-numeric: tabular-nums;
 }
@@ -1787,7 +1795,8 @@ body[data-view='menu'] .layout {
   position: absolute;
   bottom: 3px;
   right: 6px;
-  font-size: 10px;
+  font-size: 12px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
   color: var(--fg-faint);
   font-variant-numeric: tabular-nums;
 }
@@ -1844,6 +1853,15 @@ body[data-view='menu'] .layout {
 .looks {
   width: 100%;
   gap: 4px;
+  /* label and palette share one line: the row is a toolbar, not a form field */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+}
+
+.looks #autoWhy {
+  grid-column: 1 / -1;
 }
 
 .looks label {
@@ -1876,6 +1894,31 @@ body[data-view='menu'] .layout {
 
 .looks #autoWhy {
   line-height: 1.35;
+}
+
+/* ---------- target sizes the audit flagged ---------- */
+
+/* the "/100" next to the score in the header was computed from em and fell under 12 px */
+.chip--score small {
+  font-size: 12px;
+}
+
+.block__seek {
+  min-height: 32px;
+}
+
+/* the sources under a tip are a row of links, not words inside a sentence: they need a target */
+.sources a,
+.tip__meta a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 4px;
+}
+
+/* a range input is 16 px tall by default; the thumb is hard to catch on a laptop trackpad */
+input[type='range'] {
+  min-height: 28px;
 }
 
 /* ---------- the selected shot, under the timeline ---------- */
@@ -2012,7 +2055,7 @@ body[data-view='menu'] .layout {
 
 .prepcard__grip {
   flex: 0 0 auto;
-  width: 22px;
+  width: 32px;
   min-height: 44px;
   padding: 0;
   border: 0;
@@ -2307,7 +2350,7 @@ body[data-result='0'] .stage > .empty-note {
 
   .tabbar button {
     min-height: 48px;
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .tabbar svg {
@@ -2416,7 +2459,7 @@ body[data-result='0'] .stage > .empty-note {
 
   /* the preview leaves room for the timeline, the looks, the mix and the buttons under it */
   .viewport {
-    height: min(42dvh, 440px);
+    height: min(40dvh, 440px);
   }
   .panel.panel--score {
     flex: 1 1 42%;
@@ -2431,6 +2474,11 @@ body[data-result='0'] .stage > .empty-note {
   * {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .hcard:hover {
+    transform: none;
   }
 }
 
@@ -2525,7 +2573,7 @@ body[data-result='0'] .stage > .empty-note {
 }
 
 .clipcard small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--fg-faint);
 }
 
@@ -2587,6 +2635,17 @@ body[data-result='0'] .stage > .empty-note {
   .stage__toggle {
     order: 3;
     margin-left: auto;
+  }
+
+  .block__seek,
+  .sources a,
+  .tip__meta a,
+  .prepcard__grip {
+    min-height: 44px;
+  }
+
+  input[type='range'] {
+    min-height: 44px;
   }
 
   .tl__track,
