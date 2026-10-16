@@ -34,6 +34,18 @@
   display: none !important;
 }
 
+/* what crawlers and a JavaScript-less visit see; the app replaces it on boot */
+.seo-fallback {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  line-height: 1.6;
+}
+
+.seo-fallback a {
+  color: var(--primary);
+}
+
 html,
 body {
   margin: 0;

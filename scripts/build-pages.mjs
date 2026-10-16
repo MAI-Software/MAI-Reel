@@ -19,7 +19,7 @@ const TOOLS = [
       slug: 'transcribir',
       title: 'Transcribir un vídeo a texto gratis, sin subir nada',
       description:
-        'Saca el texto de cualquier vídeo o audio en tu propio navegador: subtítulos con tiempos reales, .SRT y .TXT. Sin cuenta, sin marca de agua y sin enviar el archivo a ningún servidor.',
+        'Saca el texto de cualquier vídeo en tu navegador: subtítulos con tiempos reales, .SRT y .TXT. Sin cuenta, sin marca de agua y sin subir el archivo.',
       h1: 'Transcribe un vídeo a texto en tu navegador',
       lead:
         'Arrastra un vídeo o un audio y MAI-Reel escribe lo que se dice, con la marca de tiempo de cada bloque. El modelo de voz se descarga una vez y trabaja dentro de tu dispositivo: el archivo nunca sale de él.',
@@ -34,7 +34,7 @@ const TOOLS = [
       slug: 'transcribe',
       title: 'Transcribe a video to text for free, without uploading it',
       description:
-        'Get the text out of any video or audio inside your own browser: captions with real timings, .SRT and .TXT. No account, no watermark, and the file never leaves your device.',
+        'Get the text out of any video in your browser: captions with real timings, .SRT and .TXT. No account, no watermark, and nothing is uploaded.',
       h1: 'Transcribe a video to text in your browser',
       lead:
         'Drop a video or an audio file and MAI-Reel writes down what is said, with a timestamp on every block. The speech model downloads once and runs on your device: the file is never uploaded.',
@@ -52,7 +52,7 @@ const TOOLS = [
       slug: 'crear-reel',
       title: 'Crear un reel automático desde tus fotos y vídeos',
       description:
-        'Monta un reel vertical en segundos: el editor corta al ritmo, elige efectos y color según tu material, pone subtítulos y te da una nota de viralidad con motivos.',
+        'Monta un reel vertical en segundos: corta al ritmo, elige efectos y color según tu material, pone subtítulos y puntúa el resultado de 1 a 100.',
       h1: 'Crea un reel automático con tus fotos y vídeos',
       lead:
         'Importa lo que tengas y el montador decide duración, cortes, efectos y color midiendo tu propio material. Un vídeo largo se parte en varios planos y las pausas se van solas.',
@@ -85,7 +85,7 @@ const TOOLS = [
       slug: 'mejorar-video',
       title: 'Mejorar un vídeo ya editado con movimiento de cámara',
       description:
-        'Modo entretenimiento: añade temblor de cámara al ritmo, zooms sobre la voz y micromovimientos a un vídeo que ya tiene sus subtítulos, sin taparlos ni deformar caras.',
+        'Añade temblor de cámara al ritmo y zooms sobre la voz a un vídeo ya montado, sin tapar sus subtítulos ni deformar caras. Gratis y en el navegador.',
       h1: 'Dale movimiento a un vídeo que ya está montado',
       lead:
         'Pensado para lo que sale de CapCut: el vídeo se queda como está y encima se añade una cámara que responde a su propio audio. Los subtítulos incrustados y las caras se respetan.',
@@ -100,7 +100,7 @@ const TOOLS = [
       slug: 'boost-video',
       title: 'Boost a finished video with camera movement',
       description:
-        'Entertainment mode: adds camera shake on the beat, push-ins on the voice and micro moves to a video that already has its captions, without covering them or warping faces.',
+        'Add camera shake on the beat and push-ins on the voice to a finished video, without covering its captions or warping faces. Free, in your browser.',
       h1: 'Add movement to a video that is already edited',
       lead:
         'Made for what comes out of CapCut: the video stays as it is and a camera that reacts to its own audio is added on top. Burned-in captions and faces are respected.',
